@@ -86,11 +86,11 @@ class EASTMONEY(StockDataSource):
             }
 
         try:
-            logger.debug(f"开始获取股票 {code} 详情...")
+            logger.debug(f"开始获取股票详情... {code}")
             result = await asyncio.to_thread(_fetch)
             return result
         except Exception as e:
-            logger.error(f"获取股票 {code} 详情失败: {e}")
+            logger.error(f"获取股票详情失败: {e}")
             return {}
 
     @manager.register_method(weight=1.2, max_requests_per_minute=30, max_concurrent=5)
@@ -113,8 +113,9 @@ class EASTMONEY(StockDataSource):
             stocks[col] = None
 
         # 获取详情
-        stocks = await self._fetch_stock_detail(stocks)
-
+        stocks = [ await self._fetch_stock_detail(code) for code in stocks["证券代码"] ]
+        stocks = pd.DataFrame(stocks)
+        
         # 清洗
         stocks = self._clean_numeric_columns(stocks)
         stocks = self._format_listing_date(stocks)
@@ -148,7 +149,8 @@ class EASTMONEY(StockDataSource):
         返回:
             包含股票数据的 DataFrame，如果无数据则返回空 DataFrame
         """
-
+        start_date = start_date.replace("-", "")
+        end_date = end_date.replace("-", "")
         logger.info(f"获取数据: {stock_code} ({start_date} 至 {end_date})")
 
         try:

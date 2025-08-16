@@ -12,7 +12,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class AppConfig(BaseSettings):
     # 基础配置
     ENV: str = Field("dev")
-    LOG_LEVEL: str = Field("INFO")
+    LOG_LEVEL: str = Field("DEBUG")
     DEBUG: bool = Field(True)
 
     # SQLite 数据库配置

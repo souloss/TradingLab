@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from typing import List, Optional, Sequence
 
+from loguru import logger
 import pandas as pd
 from sqlalchemy import Column, DateTime, UniqueConstraint, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +34,64 @@ class StockDailyRepository(BaseRepository[StockDailyData]):
         res = await self.session.execute(stmt)
         return res.scalars().all()
 
+    async def upsert_stock_dailys_bydf(self, df:pd.DataFrame):
+        datas = dataframe_to_daily_data(df)
+        return await self.upsert_many(datas, auto_commit=True)
+
+
+def dataframe_to_daily_data(df: pd.DataFrame) -> List[StockDailyData]:
+    """
+    将指定格式的 DataFrame 转换为 StockDailyData 对象列表
+
+    :param df: 包含股票日线数据的 DataFrame
+    :return: StockDailyData 对象列表
+    """
+    # 确保 DataFrame 包含所有必要的列
+    required_columns = [
+        "股票代码",
+        "open",
+        "close",
+        "high",
+        "low",
+        "volume",
+        "成交额",
+        "振幅",
+        "涨跌幅",
+        "涨跌额",
+        "换手率",
+    ]
+
+    if not all(col in df.columns for col in required_columns):
+        missing = [col for col in required_columns if col not in df.columns]
+        raise ValueError(f"DataFrame {df.columns}, {df.index} 缺少必要的列: {missing}")
+
+    # # 确保索引是日期类型
+    # if not isinstance(df.index, pd.DatetimeIndex):
+    #     raise TypeError("DataFrame 索引必须是 DatetimeIndex 类型")
+
+    # 创建存储结果的列表
+    daily_data_list = []
+    # 遍历 DataFrame 的每一行
+    for idx, row in df.iterrows():
+        # 将索引转换为日期对象
+        # 创建 StockDailyData 对象并添加到列表
+        daily_data = StockDailyData(
+            symbol=row["股票代码"],
+            trade_date=row["date"].to_pydatetime().date(),
+            open_price=row["open"],
+            close_price=row["close"],
+            high_price=row["high"],
+            low_price=row["low"],
+            volume=row["volume"],
+            turnover=row["成交额"],
+            amplitude=row["振幅"],
+            change_rate=row["涨跌幅"],
+            change_amount=row["涨跌额"],
+            turnover_rate=row["换手率"],
+        )
+        daily_data_list.append(daily_data)
+
+    return daily_data_list
 
 def daily_data_to_dataframe(daily_data_list: List[StockDailyData]):
     """

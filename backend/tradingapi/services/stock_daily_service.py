@@ -1,3 +1,4 @@
+import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 
@@ -36,11 +37,11 @@ class StockDailyService:
 
         # 如果调整后开始日期晚于结束日期，则没有数据
         if adjusted_start_dt > end_dt:
-            logger.info(
+            logger.warning(
                 f"请求日期范围 {start_dt} 至 {end_dt} 早于上市日期 {listing_date}"
             )
             return pd.DataFrame()
-
+        
         daily_data = await self.repo.get_daily_data(code, adjusted_start_dt, end_dt)
         cached_df = daily_data_to_dataframe(daily_data)
         missing_days = []
@@ -57,48 +58,43 @@ class StockDailyService:
             # 3.2 检查缓存是否覆盖所有交易日
             cached_dates = cached_df.index
             missing_days = [d for d in trading_days if d not in cached_dates]
-
             # 如果没有任何交易日缺失，则使用缓存
             if not missing_days:
-                logger.info(f"缓存满足要求: {code} ({adjusted_start_dt} 至 {end_date})")
+                logger.debug(f"缓存满足要求: {code} ({adjusted_start_dt} 至 {end_date})")
                 return _filter_date_range(cached_df, adjusted_start_dt, end_dt).copy()
 
         # 4. 确定需要获取的数据范围
-        fetch_ranges = _merge_consecutive_dates(missing_days)
+        fetch_ranges = _merge_consecutive_dates(missing_days) if missing_days else [(start_date, end_date)]
 
         # 5. 获取缺失数据
         new_dfs = []
         stock_fetcher: StockInfoFetcher = manager.bind(StockInfoFetcher)
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            # 提交所有任务到线程池
-            future_to_range = {
-                executor.submit(
-                    stock_fetcher.fetch_stock_data, code, fetch_start, fetch_end, 3
-                ): (
-                    fetch_start,
-                    fetch_end,
-                )
-                for fetch_start, fetch_end in fetch_ranges
-            }
-        for future in as_completed(future_to_range):
-            fetch_start, fetch_end = future_to_range[future]
-            try:
-                df = future.result()
-                if not df.empty:
-                    logger.info(f"成功获取: {code} ({fetch_start}至{fetch_end})")
-                    new_dfs.append(df)
-                else:
-                    logger.warning(f"空数据: {code} ({fetch_start}至{fetch_end})")
-            except Exception as e:
-                logger.error(f"获取失败[{fetch_start}-{fetch_end}]: {str(e)}")
+        logger.debug(f"需要获取缺失数据: {fetch_ranges}, missday:{missing_days}")
+
+        tasks = [
+            stock_fetcher.fetch_stock_data(
+                code, fetch_start.isoformat(), fetch_end.isoformat()
+            )
+            for fetch_start, fetch_end in fetch_ranges
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        new_dfs = []
+        for (fetch_start, fetch_end), result in zip(fetch_ranges, results):
+            if isinstance(result, Exception):
+                logger.error(f"获取失败[{fetch_start} - {fetch_end}]: {result}")
+            elif result is None or result.empty:
+                logger.warning(f"空数据: {code} ({fetch_start}至{fetch_end})")
+            else:
+                logger.info(f"成功获取: {code} ({fetch_start}至{fetch_end})")
+                new_dfs.append(result)
 
         # 6. 合并缓存和新数据
         combined_df = _merge_data(cached_df, new_dfs)
 
         # 7. 新数据不为空，才有必要重新保存
         if new_dfs:
-            ...
-            # await self.repo.upsert_stock_dailys(combined_df)
+            await self.repo.upsert_stock_dailys_bydf(combined_df)
 
         # 8. 返回请求日期范围内的数据
         return (
@@ -192,11 +188,17 @@ def _filter_date_range(
     筛选指定日期范围内的数据
 
     参数:
-        df: 原始数据
-        start_dt: 开始日期
-        end_dt: 结束日期
+        df: 原始数据，索引必须是DatetimeIndex
+        start_dt: 开始日期（pd.Timestamp）
+        end_dt: 结束日期（pd.Timestamp）
 
     返回:
         筛选后的DataFrame
     """
-    return df.loc[(df.index >= start_dt) & (df.index <= end_dt)]
+    # 确保索引是DatetimeIndex
+    if not isinstance(df.index, pd.DatetimeIndex):
+        raise TypeError("DataFrame索引必须是DatetimeIndex")
+
+    # 直接使用索引进行范围筛选
+    mask = (df.index >= start_dt) & (df.index <= end_dt)
+    return df.loc[mask]

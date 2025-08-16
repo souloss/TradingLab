@@ -2,6 +2,7 @@
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
+import pandas as pd
 from sqlalchemy import Column, DateTime, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import Field, SQLModel
@@ -174,3 +175,57 @@ class StockBasicInfoRepository(BaseRepository[StockBasicInfo]):
 
         result = await self.session.execute(query)
         return result.scalars().all()
+
+
+def dataframe_to_stock_data(df: pd.DataFrame) -> List[StockBasicInfo]:
+    """
+    将指定格式的 DataFrame 转换为 StockBasicInfo 对象列表
+
+    :param df: 包含股票基础数据的 DataFrame
+    :return: StockBasicInfo 对象列表
+    """
+    # 确保 DataFrame 包含所有必要的列
+    required_columns = [
+        "交易所",
+        "板块",
+        "股票类型",
+        "证券代码",
+        "名称",
+        "上市时间",
+        "行业",
+        "总股本",
+        "流通股",
+        "总市值",
+        "流通市值",
+    ]
+
+    if not all(col in df.columns for col in required_columns):
+        missing = [col for col in required_columns if col not in df.columns]
+        raise ValueError(f"DataFrame {df.columns}, {df.index} 缺少必要的列: {missing}")
+
+    # # 确保索引是日期类型
+    # if not isinstance(df.index, pd.DatetimeIndex):
+    #     raise TypeError("DataFrame 索引必须是 DatetimeIndex 类型")
+
+    # 创建存储结果的列表
+    stock_data_list = []
+    # 遍历 DataFrame 的每一行
+    for idx, row in df.iterrows():
+        # 将索引转换为日期对象
+        # 创建 StockDailyData 对象并添加到列表
+        daily_data = StockBasicInfo(
+            symbol=row["证券代码"],
+            exchange=row["交易所"],
+            section=row["板块"],
+            stock_type=row["股票类型"],
+            name=row["名称"],
+            listing_date=row["上市时间"],
+            industry=row["行业"],
+            total_shares=row["总股本"],
+            float_shares=row["流通股"],
+            total_market_value=row["总市值"],
+            float_market_value=row["流通市值"],
+        )
+        stock_data_list.append(daily_data)
+
+    return stock_data_list

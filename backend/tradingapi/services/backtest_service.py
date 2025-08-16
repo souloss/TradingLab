@@ -11,11 +11,9 @@ from chinese_calendar import is_holiday
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# from tradingapi.st .stock_signals import (
-#     calculate_technical_indicators,
-#     SignalManager,
-#     STRATEGY_MAP,
-# )
+from tradingapi.fetcher.interface import StockInfoFetcher
+from tradingapi.repositories.stock_basic_info import dataframe_to_stock_data
+from tradingapi.fetcher.manager import manager
 from tradingapi.models import BacktestResult
 from tradingapi.repositories.backtest_result import BacktestResultRepository
 from tradingapi.schemas.backtest import (BacktestRequest, BacktestResponse,
@@ -56,7 +54,9 @@ class BacktestService(BaseService[BacktestResult, BacktestResultRepository]):
             req.stock_code, req.start_date, req.end_date
         )
         if df.empty:
+            logger.warning(f"{req.model_dump()} 请求回测，日线数据为空")
             return None
+
         # 创建信号管理器和生成信号
         signal_mgr = create_signal_manager()
         for strategy_item in req.strategies:
@@ -103,6 +103,13 @@ class BacktestService(BaseService[BacktestResult, BacktestResultRepository]):
             )
         # 获取股票名称（假设有相关服务）
         stock_name = await self.stock_service.get_stock_name_by_code(req.stock_code)
+        if not stock_name:
+            stock_fetcher: StockInfoFetcher = manager.bind(StockInfoFetcher)
+            stock_info = await stock_fetcher.get_all_stock_basic_info()
+            await self.stock_service.repo.upsert_many(dataframe_to_stock_data(stock_info), auto_commit=True)
+            
+        stock_name = await self.stock_service.get_stock_name_by_code(req.stock_code)
+
         # 构建回测结果对象（核心实现）
         backtest_result = BacktestResult(
             stock_code=req.stock_code,
@@ -125,8 +132,6 @@ class BacktestService(BaseService[BacktestResult, BacktestResultRepository]):
         )
         added_instance = await self.repo.add(backtest_result)  # 添加到会话
         # 关键：显式刷新会话，确保数据写入数据库
-        await self.repo.session.flush()
-        await self.repo.session.refresh(backtest_result)
         await self.repo.session.commit()
         resp = BacktestResponse.model_validate(added_instance)
         # 构建返回对象
