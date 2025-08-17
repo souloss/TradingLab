@@ -106,7 +106,7 @@ class BacktestService(BaseService[BacktestResult, BacktestResultRepository]):
         if not stock_name:
             stock_fetcher: StockInfoFetcher = manager.bind(StockInfoFetcher)
             stock_info = await stock_fetcher.get_all_stock_basic_info()
-            await self.stock_service.repo.upsert_many(dataframe_to_stock_data(stock_info), auto_commit=True)
+            await self.stock_service.repo.upsert_many(dataframe_to_stock_data(stock_info), match_fields=["symbol"], auto_commit=True)
             
         stock_name = await self.stock_service.get_stock_name_by_code(req.stock_code)
 

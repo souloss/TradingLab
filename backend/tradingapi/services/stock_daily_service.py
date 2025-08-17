@@ -186,19 +186,30 @@ def _filter_date_range(
 ) -> pd.DataFrame:
     """
     筛选指定日期范围内的数据
-
     参数:
-        df: 原始数据，索引必须是DatetimeIndex
+        df: 原始数据，可以包含日期列或DatetimeIndex
         start_dt: 开始日期（pd.Timestamp）
         end_dt: 结束日期（pd.Timestamp）
-
     返回:
         筛选后的DataFrame
     """
-    # 确保索引是DatetimeIndex
-    if not isinstance(df.index, pd.DatetimeIndex):
-        raise TypeError("DataFrame索引必须是DatetimeIndex")
-
-    # 直接使用索引进行范围筛选
-    mask = (df.index >= start_dt) & (df.index <= end_dt)
-    return df.loc[mask]
+    # 检查是否已有DatetimeIndex
+    if isinstance(df.index, pd.DatetimeIndex):
+        # 直接使用索引进行范围筛选
+        mask = (df.index >= start_dt) & (df.index <= end_dt)
+        return df.loc[mask]
+    else:
+        # 检查是否有日期列
+        date_columns = [col for col in df.columns if 'date' in col.lower()]
+        if not date_columns:
+            raise ValueError(f"DataFrame既没有DatetimeIndex，也没有日期列。可用列: {df.columns.tolist()}")
+        
+        # 使用找到的日期列
+        date_col = date_columns[0]
+        # 确保日期列是datetime类型
+        if not pd.api.types.is_datetime64_any_dtype(df[date_col]):
+            df[date_col] = pd.to_datetime(df[date_col])
+        
+        # 筛选日期范围
+        mask = (df[date_col] >= start_dt) & (df[date_col] <= end_dt)
+        return df.loc[mask]
