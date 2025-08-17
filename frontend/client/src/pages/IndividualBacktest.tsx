@@ -86,19 +86,15 @@ export default function IndividualBacktest() {
           parameters: strategyParameters[strategyId]
         };
       });
-      console.log("开始回测，发起请求")
       const response = await apiRequest<BacktestResponse>('POST', '/api/v1/backtest/stock', {
         stockCode,
         startDate,
         endDate,
         strategies: selectedStrategyConfigs
       });
-      console.log("获取到回测数据")
-      console.log(response)
       return response;
     },
     onSuccess: (data) => {
-      console.log("开始回测，获取数据成功！" + data)
       setLocation("/results/" + data.id);
     }
   });

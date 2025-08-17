@@ -9,6 +9,7 @@ import IndividualBacktest from "@/pages/IndividualBacktest";
 import SelectionBacktest from "@/pages/SelectionBacktest";
 import ResultsPage from "@/pages/ResultsPage";
 import NotFound from "@/pages/not-found";
+import { useGlobalErrorHandler } from "./hooks/useGlobalErrorHandler";
 
 function Router() {
   return (
@@ -37,6 +38,8 @@ function Router() {
 }
 
 function App() {
+  useGlobalErrorHandler(); // 全局错误捕获
+  
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

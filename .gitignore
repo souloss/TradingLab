@@ -2,8 +2,8 @@
 node_modules/
 
 # 忽略构建输出目录
-/dist
-/build
+dist
+build
 
 # 忽略本地环境变量文件
 .env.local
@@ -22,8 +22,8 @@ node_modules/
 .sass-cache/
 
 # 忽略日志文件
-/logs
-/debug.log
+logs
+debug.log
 
 # 忽略代码覆盖率报告
 /coverage
