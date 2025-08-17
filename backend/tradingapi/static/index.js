@@ -136,7 +136,8 @@ var MemStorage = class {
     const result = {
       ...insertResult,
       id,
-      createdAt: /* @__PURE__ */ new Date()
+      createdAt: /* @__PURE__ */ new Date(),
+      stockCode: insertResult.stockCode ?? null
     };
     this.backtestResults.set(id, result);
     return result;
@@ -168,7 +169,18 @@ var MemStorage = class {
         high: Number(high.toFixed(2)),
         low: Number(low.toFixed(2)),
         close: Number(close.toFixed(2)),
-        volume: Math.floor(volume)
+        volume: Math.floor(volume),
+        extra_fields: {
+          \u6210\u4EA4\u989D: Math.floor(Math.random() * 1e7) + 5e5,
+          \u632F\u5E45: (Math.random() * 20).toFixed(2),
+          \u6DA8\u8DCC\u5E45: (Math.random() * 20 - 10).toFixed(2),
+          \u6362\u624B\u7387: (Math.random() * 15).toFixed(2),
+          ATR: (Math.random() * 10).toFixed(2),
+          Signal_ATR: Math.random() > 0.5 ? 1 : 0,
+          Confidence_ATR: 0,
+          Signal_Combined: Math.random() > 0.5 ? 1 : 0,
+          Signal_Confidence: 0
+        }
       });
       currentPrice = close;
       currentVolume = volume;

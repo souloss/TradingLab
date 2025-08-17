@@ -25,7 +25,8 @@ const calculateMA = (data: Tick[], period: number): Array<[number, number]> => {
     sum += close;
     if (i >= period) sum -= Number((data[i - period] as any).close);
     if (i >= period - 1) {
-      result.push([new Date((data[i] as any).date).getTime(), sum / period]);
+      const maValue = sum / period;
+      result.push([new Date((data[i] as any).date).getTime(), Math.round(maValue * 100) / 100]);
     }
   }
   return result;
@@ -134,7 +135,24 @@ export default function StockChart({
     isNaN(cutoff) ? arr : arr.filter((row) => row[0] >= cutoff);
 
   // 主图指标（如果存在就画）
-  const mainIndicators = ["ATR", "RSI", "K", "D", "J"];
+  const mainIndicators = [
+    "ATR", 
+    "RSI", 
+    "K", 
+    "D", 
+    "J",
+    "MACD",
+    "MACD_Signal",
+    "MACD_Hist",
+    "BB_Upper",
+    "BB_Middle",
+    "BB_Lower",
+    "Vol_MA5",
+    "Vol_MA10",
+    "Vol_MA20",
+    "Vol_MA30",
+    "Vol_MA60",
+  ];
   const indicatorSeries = useMemo(() => {
     return mainIndicators
       .map(name => {
@@ -151,7 +169,7 @@ export default function StockChart({
           name,
           data: filterByCutoff(seriesData),
           lineWidth: 1,
-          yAxis: 0,
+          yAxis: 2,
           tooltip: { valueDecimals: 2 },
         };
       })
@@ -274,11 +292,10 @@ export default function StockChart({
         tooltip: {
           shared: true,
           formatter: function () {
-            const point = this.points?.[0]?.points as unknown as Highcharts.Point;
+            const point = this.points?.[0]?.point;
             const extra = sortedData.find(
-              d => new Date(d.date).getTime() === point?.x
+              d => new Date(d.date.split('T')[0]).getTime() === point?.x
             )?.extra_fields;
-
             let html = `<b>${Highcharts.dateFormat("%Y-%m-%d", point?.x)}</b><br/>`;
 
             this.points?.forEach(p => {
@@ -298,7 +315,6 @@ export default function StockChart({
                 }
               });
             }
-
             return html;
           },
         },
@@ -314,18 +330,30 @@ export default function StockChart({
         yAxis: [
           {
             title: { text: "价格" },
-            height: "70%",
+            height: "50%",
             resize: { enabled: true },
+            // 设置Y轴标签格式，保留两位小数
+            labels: {
+              formatter: function () {
+                return Highcharts.numberFormat(this.value as number, 2);
+              }
+            }
           },
           {
             title: { text: "成交量" },
-            top: "75%",
-            height: "25%",
+            top: "55%",
+            height: "20%",
+            offset: 0,
+          },
+          {
+            // 副图 - 技术指标
+            title: { text: "技术指标" },
+            top: "80%",
+            height: "20%",
             offset: 0,
           },
         ],
         series: [
-          ...indicatorSeries,
           {
             type: "candlestick",
             name: "股价",
@@ -362,6 +390,7 @@ export default function StockChart({
             data: volumeData,
             yAxis: 1,
           },
+          ...indicatorSeries,
         ],
       };
 
