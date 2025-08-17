@@ -1,21 +1,68 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { StockData } from "../types";
 
 interface StockChartProps {
   data: StockData[];
   trades: Array<{
     date: string;
-    type: 'BUY' | 'SELL';
+    type: "BUY" | "SELL" | "HOLD";
     price: number;
     quantity: number;
   }>;
-  selectedPeriod: string;
+  selectedPeriod: string; // "1d" | "1w" | "1m" | "3m" | "6m" | "1y"
   onPeriodChange: (period: string) => void;
 }
 
-export default function StockChart({ data, trades, selectedPeriod, onPeriodChange }: StockChartProps) {
+// ---- 工具函数 ----
+type Tick = { date: string | Date; close: number };
+const calculateMA = (data: Tick[], period: number): Array<[number, number]> => {
+  if (period <= 0 || data.length < period) return [];
+  const result: Array<[number, number]> = [];
+  let sum = 0;
+  for (let i = 0; i < data.length; i++) {
+    const close = Number((data[i] as any).close);
+    if (isNaN(close)) continue;
+    sum += close;
+    if (i >= period) sum -= Number((data[i - period] as any).close);
+    if (i >= period - 1) {
+      result.push([new Date((data[i] as any).date).getTime(), sum / period]);
+    }
+  }
+  return result;
+};
+
+const getRangeMs = (period: string): number => {
+  const day = 24 * 60 * 60 * 1000;
+  switch (period) {
+    case "1d":
+      return 1 * day;
+    case "1w":
+      return 7 * day;
+    case "1m":
+      return 30 * day;
+    case "3m":
+      return 90 * day;
+    case "6m":
+      return 180 * day;
+    case "1y":
+      return 365 * day;
+    default:
+      return Number.POSITIVE_INFINITY; // 全部
+  }
+};
+
+export default function StockChart({
+  data,
+  trades,
+  selectedPeriod,
+  onPeriodChange,
+}: StockChartProps) {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<any>(null);
+  const highchartsRef = useRef<any>(null);
+
+  const [highchartsLoaded, setHighchartsLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const periods = [
     { value: "1d", label: "1天" },
@@ -26,225 +73,284 @@ export default function StockChart({ data, trades, selectedPeriod, onPeriodChang
     { value: "1y", label: "1年" },
   ];
 
-  useEffect(() => {
-    if (!chartRef.current || !data || data.length === 0) return;
+  // ---- 数据预处理（排序，便于窗口裁剪和均线计算）----
+  const sortedData = useMemo(() => {
+    const d = Array.isArray(data) ? [...data] : [];
+    d.sort(
+      (a, b) =>
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    return d;
+  }, [data]);
 
-    // Dynamically import Highcharts to avoid SSR issues
-    import('highcharts/highstock').then((Highcharts) => {
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-      }
+  const latestTs = useMemo(() => {
+    if (!sortedData.length) return NaN;
+    return new Date(sortedData[sortedData.length - 1].date).getTime();
+  }, [sortedData]);
 
-      // Prepare price data for candlestick chart
-      const priceData = data.map(item => [
+  const cutoff = useMemo(() => {
+    const range = getRangeMs(selectedPeriod);
+    return isNaN(latestTs) ? NaN : latestTs - range;
+  }, [latestTs, selectedPeriod]);
+
+  // 全量价格/成交量（先算再裁剪）
+  const priceDataAll = useMemo(
+    () =>
+      sortedData.map((item) => [
         new Date(item.date).getTime(),
         item.open,
         item.high,
         item.low,
-        item.close
-      ]);
+        item.close,
+      ]) as Array<[number, number, number, number, number]>,
+    [sortedData]
+  );
 
-      // Prepare volume data
-      const volumeData = data.map(item => [
+  const volumeDataAll = useMemo(
+    () =>
+      sortedData.map((item) => [
         new Date(item.date).getTime(),
-        item.volume
-      ]);
+        item.volume,
+      ]) as Array<[number, number]>,
+    [sortedData]
+  );
 
-      type Tick = { date: string | Date; close: number };
+  // 全量均线（按全量算，保证窗口开头的均线准确，再按窗口裁剪）
+  const ma5All = useMemo(
+    () => calculateMA(sortedData as unknown as Tick[], 5),
+    [sortedData]
+  );
+  const ma10All = useMemo(
+    () => calculateMA(sortedData as unknown as Tick[], 10),
+    [sortedData]
+  );
+  const ma20All = useMemo(
+    () => calculateMA(sortedData as unknown as Tick[], 20),
+    [sortedData]
+  );
 
-      const calculateMA = (
-        data: Tick[],
-        period: number
-      ): Array<[number, number]> => {
-        if (period <= 0 || data.length < period) return [];
+  // 根据 selectedPeriod 裁剪窗口数据
+  const filterByCutoff = <T extends [number, ...any[]]>(arr: T[]) =>
+    isNaN(cutoff) ? arr : arr.filter((row) => row[0] >= cutoff);
 
-        const result: Array<[number, number]> = [];
-        let sum = 0;
+  const priceData = useMemo(() => filterByCutoff(priceDataAll), [priceDataAll, cutoff]);
+  const volumeData = useMemo(() => filterByCutoff(volumeDataAll), [volumeDataAll, cutoff]);
+  const ma5Data = useMemo(() => filterByCutoff(ma5All), [ma5All, cutoff]);
+  const ma10Data = useMemo(() => filterByCutoff(ma10All), [ma10All, cutoff]);
+  const ma20Data = useMemo(() => filterByCutoff(ma20All), [ma20All, cutoff]);
 
-        for (let i = 0; i < data.length; i++) {
-          const close = Number(data[i].close);
-          if (isNaN(close)) continue;          // 跳过非法值
+  // 交易信号（仅 BUY/SELL，且按窗口裁剪）
+  const buyPoints = useMemo(() => {
+    const pts = trades
+      .filter((t) => t.type === "BUY")
+      .map((t) => ({
+        x: new Date(t.date).getTime(),
+        y: t.price,
+        marker: {
+          symbol: "circle",
+          fillColor: "#22c55e",
+          lineColor: "#22c55e",
+          lineWidth: 2,
+          radius: 6,
+        },
+        dataLabels: {
+          enabled: true,
+          format: "B",
+          style: { color: "#22c55e", fontWeight: "bold" },
+        },
+      }));
+    return isNaN(cutoff) ? pts : pts.filter((p) => p.x >= cutoff);
+  }, [trades, cutoff]);
 
-          sum += close;
-          if (i >= period) sum -= Number(data[i - period].close);
+  const sellPoints = useMemo(() => {
+    const pts = trades
+      .filter((t) => t.type === "SELL")
+      .map((t) => ({
+        x: new Date(t.date).getTime(),
+        y: t.price,
+        marker: {
+          symbol: "circle",
+          fillColor: "#ef4444",
+          lineColor: "#ef4444",
+          lineWidth: 2,
+          radius: 6,
+        },
+        dataLabels: {
+          enabled: true,
+          format: "S",
+          style: { color: "#ef4444", fontWeight: "bold" },
+        },
+      }));
+    return isNaN(cutoff) ? pts : pts.filter((p) => p.x >= cutoff);
+  }, [trades, cutoff]);
 
-          if (i >= period - 1) {
-            result.push([
-              new Date(data[i].date).getTime(),
-              sum / period
-            ]);
-          }
-        }
-        return result;
+  // ---- 只加载一次 Highcharts（SSR 安全，且避免 default 导出差异）----
+  useEffect(() => {
+    let mounted = true;
+    const loadHighcharts = async () => {
+      try {
+        const mod = await import("highcharts/highstock");
+        if (!mounted) return;
+        highchartsRef.current = (mod as any).default || mod;
+        setHighchartsLoaded(true);
+        setError(null);
+      } catch (err) {
+        console.error("Failed to load Highcharts:", err);
+        if (!mounted) return;
+        setError("无法加载图表库，请刷新页面重试");
+        setHighchartsLoaded(false);
+      }
+    };
+    if (!highchartsRef.current && !highchartsLoaded) {
+      loadHighcharts();
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [highchartsLoaded]);
+
+  // ---- 根据依赖创建/更新图表 ----
+  useEffect(() => {
+    const Highcharts = highchartsRef.current;
+    if (!Highcharts || !chartRef.current) return;
+
+    // 没有数据或窗口裁剪后没有数据
+    if (!priceData.length) {
+      if (chartInstance.current) {
+        chartInstance.current.destroy();
+        chartInstance.current = null;
+      }
+      return;
+    }
+
+    // 清除旧图
+    if (chartInstance.current) {
+      chartInstance.current.destroy();
+      chartInstance.current = null;
+    }
+
+    try {
+      const chartOptions: any = {
+        chart: {
+          height: 400,
+          backgroundColor: "transparent",
+        },
+        title: { text: null },
+        credits: { enabled: false },
+        rangeSelector: { enabled: false },
+        scrollbar: { enabled: false },
+        navigator: { enabled: false },
+        xAxis: {
+          // 强制设置窗口范围（与数据裁剪一致，交互连贯）
+          min: isNaN(cutoff) ? undefined : cutoff,
+          max: latestTs,
+        },
+        plotOptions: {
+          candlestick: {
+            color: "#ef4444",
+            upColor: "#22c55e",
+            lineColor: "#ef4444",
+            upLineColor: "#22c55e",
+          },
+          column: { color: "#8b5cf6" },
+        },
+        yAxis: [
+          {
+            title: { text: "价格" },
+            height: "70%",
+            resize: { enabled: true },
+          },
+          {
+            title: { text: "成交量" },
+            top: "75%",
+            height: "25%",
+            offset: 0,
+          },
+        ],
+        series: [
+          {
+            type: "candlestick",
+            name: "股价",
+            data: priceData,
+            yAxis: 0,
+          },
+          {
+            type: "line",
+            name: "MA5",
+            data: ma5Data,
+            color: "#f59e0b",
+            lineWidth: 1,
+            yAxis: 0,
+          },
+          {
+            type: "line",
+            name: "MA10",
+            data: ma10Data,
+            color: "#06b6d4",
+            lineWidth: 1,
+            yAxis: 0,
+          },
+          {
+            type: "line",
+            name: "MA20",
+            data: ma20Data,
+            color: "#8b5cf6",
+            lineWidth: 1,
+            yAxis: 0,
+          },
+          {
+            type: "column",
+            name: "成交量",
+            data: volumeData,
+            yAxis: 1,
+          },
+        ],
       };
 
-      const ma5Data = calculateMA(data, 5);
-      const ma10Data = calculateMA(data, 10);
-      const ma20Data = calculateMA(data, 20);
+      chartInstance.current = Highcharts.stockChart(chartRef.current, chartOptions);
 
-      try {
-        if (!chartRef.current) return;
-        chartInstance.current = Highcharts.default.stockChart(chartRef.current, {
-          chart: {
-            height: 400,
-            backgroundColor: 'transparent',
-          },
-          title: {
-            text: null
-          },
-          credits: {
-            enabled: false
-          },
-          rangeSelector: {
-            enabled: false
-          },
-          scrollbar: {
-            enabled: false
-          },
-          navigator: {
-            enabled: false
-          },
-          plotOptions: {
-            candlestick: {
-              color: '#ef4444',
-              upColor: '#22c55e',
-              lineColor: '#ef4444',
-              upLineColor: '#22c55e'
-            },
-            column: {
-              color: '#8b5cf6'
-            }
-          },
-          yAxis: [{
-            title: {
-              text: '价格'
-            },
-            height: '70%',
-            resize: {
-              enabled: true
-            }
-          }, {
-            title: {
-              text: '成交量'
-            },
-            top: '75%',
-            height: '25%',
-            offset: 0
-          }],
-          series: [{
-            type: 'candlestick',
-            name: '股价',
-            data: priceData,
-            yAxis: 0
-          }, {
-            type: 'line',
-            name: 'MA5',
-            data: ma5Data,
-            color: '#f59e0b',
-            lineWidth: 1,
-            yAxis: 0
-          }, {
-            type: 'line',
-            name: 'MA10',
-            data: ma10Data,
-            color: '#06b6d4',
-            lineWidth: 1,
-            yAxis: 0
-          }, {
-            type: 'line',
-            name: 'MA20',
-            data: ma20Data,
-            color: '#8b5cf6',
-            lineWidth: 1,
-            yAxis: 0
-          }, {
-            type: 'column',
-            name: '成交量',
-            data: volumeData,
-            yAxis: 1
-          }]
+      // 交易信号
+      if (buyPoints.length) {
+        chartInstance.current.addSeries({
+          type: "scatter",
+          name: "买入信号",
+          data: buyPoints,
+          yAxis: 0,
+          showInLegend: false,
         });
-
-        // Add trade signals as markers
-        if (trades && trades.length > 0) {
-          const buyPoints = trades
-            .filter(trade => trade.type === 'BUY')
-            .map(trade => ({
-              x: new Date(trade.date).getTime(),
-              y: trade.price,
-              marker: {
-                symbol: 'circle',
-                fillColor: '#22c55e',
-                lineColor: '#22c55e',
-                lineWidth: 2,
-                radius: 6
-              },
-              dataLabels: {
-                enabled: true,
-                format: 'B',
-                style: {
-                  color: '#22c55e',
-                  fontWeight: 'bold'
-                }
-              }
-            }));
-
-          const sellPoints = trades
-            .filter(trade => trade.type === 'SELL')
-            .map(trade => ({
-              x: new Date(trade.date).getTime(),
-              y: trade.price,
-              marker: {
-                symbol: 'circle',
-                fillColor: '#ef4444',
-                lineColor: '#ef4444',
-                lineWidth: 2,
-                radius: 6
-              },
-              dataLabels: {
-                enabled: true,
-                format: 'S',
-                style: {
-                  color: '#ef4444',
-                  fontWeight: 'bold'
-                }
-              }
-            }));
-
-          if (buyPoints.length > 0) {
-            chartInstance.current.addSeries({
-              type: 'scatter',
-              name: '买入信号',
-              data: buyPoints,
-              yAxis: 0,
-              showInLegend: false
-            });
-          }
-
-          if (sellPoints.length > 0) {
-            chartInstance.current.addSeries({
-              type: 'scatter',
-              name: '卖出信号',
-              data: sellPoints,
-              yAxis: 0,
-              showInLegend: false
-            });
-          }
-        }
-
-      } catch (error) {
-        console.error('Failed to create chart:', error);
       }
-    }).catch(error => {
-      console.error('Failed to load Highcharts:', error);
-    });
+      if (sellPoints.length) {
+        chartInstance.current.addSeries({
+          type: "scatter",
+          name: "卖出信号",
+          data: sellPoints,
+          yAxis: 0,
+          showInLegend: false,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to create chart:", err);
+      setError("创建图表失败，请刷新页面重试");
+    }
 
     return () => {
       if (chartInstance.current) {
         chartInstance.current.destroy();
+        chartInstance.current = null;
       }
     };
-  }, [data, trades]);
+  }, [
+    highchartsLoaded,
+    latestTs,
+    cutoff,
+    priceData,
+    volumeData,
+    ma5Data,
+    ma10Data,
+    ma20Data,
+    buyPoints,
+    sellPoints,
+  ]);
 
   return (
     <div className="bg-card rounded-xl p-6 border border-border">
@@ -258,19 +364,40 @@ export default function StockChart({ data, trades, selectedPeriod, onPeriodChang
             <button
               key={period.value}
               onClick={() => onPeriodChange(period.value)}
-              className={`time-filter px-3 py-1 rounded text-sm transition-colors ${
-                selectedPeriod === period.value
+              className={`time-filter px-3 py-1 rounded text-sm transition-colors ${selectedPeriod === period.value
                   ? "active bg-gray-900 text-white"
                   : "bg-muted text-muted-foreground hover:bg-accent"
-              }`}
+                }`}
             >
               {period.label}
             </button>
           ))}
         </div>
       </div>
-      
-      <div ref={chartRef} className="h-96 w-full bg-muted/30 rounded-lg"></div>
+
+      {error ? (
+        <div className="h-96 w-full bg-muted/30 rounded-lg flex flex-col items-center justify-center p-4">
+          <p className="text-red-500 mb-2">{error}</p>
+          <button
+            onClick={() => {
+              setError(null);
+              setHighchartsLoaded(false);
+              highchartsRef.current = null;
+            }}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+          >
+            重试
+          </button>
+        </div>
+      ) : !priceData.length ? (
+        <div className="h-96 w-full bg-muted/30 rounded-lg flex items-center justify-center">
+          <p className="text-muted-foreground">
+            所选周期暂无数据
+          </p>
+        </div>
+      ) : (
+        <div ref={chartRef} className="h-96 w-full bg-muted/30 rounded-lg" />
+      )}
     </div>
   );
 }

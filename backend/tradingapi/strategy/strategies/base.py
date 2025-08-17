@@ -113,7 +113,7 @@ class StrategyBase(Generic[TStrategyConfig]):
                         df[col] = result.values[col]
                 except Exception as e:
                     missing_indicators.append(indicator_name)
-                    logger.error(f"Failed to calculate indicator {indicator_name}: {e}")
+                    logger.error(f"Failed to calculate indicator {indicator_name}: {e}, config:{indicator_configs[indicator_name]}")
 
         if missing_indicators:
             raise StrategyError(f"Missing required indicators: {missing_indicators}")
