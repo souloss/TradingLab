@@ -167,6 +167,7 @@ export class MemStorage implements IStorage {
       ...insertResult,
       id,
       createdAt: new Date(),
+      stockCode: insertResult.stockCode ?? null, 
     };
     this.backtestResults.set(id, result);
     return result;
@@ -210,6 +211,17 @@ export class MemStorage implements IStorage {
         low: Number(low.toFixed(2)),
         close: Number(close.toFixed(2)),
         volume: Math.floor(volume),
+        extra_fields:{
+          成交额: Math.floor(Math.random() * 10000000) + 500000,
+          振幅: (Math.random() * 20).toFixed(2),   
+          涨跌幅: (Math.random() * 20 - 10).toFixed(2),
+          换手率: (Math.random() * 15).toFixed(2), 
+          ATR: (Math.random() * 10).toFixed(2),
+          Signal_ATR: Math.random() > 0.5 ? 1 : 0,  
+          Confidence_ATR: 0.0,
+          Signal_Combined: Math.random() > 0.5 ? 1 : 0,  
+          Signal_Confidence: 0.0,
+        }
       });
 
       currentPrice = close;

@@ -133,6 +133,32 @@ export default function StockChart({
   const filterByCutoff = <T extends [number, ...any[]]>(arr: T[]) =>
     isNaN(cutoff) ? arr : arr.filter((row) => row[0] >= cutoff);
 
+  // 主图指标（如果存在就画）
+  const mainIndicators = ["ATR", "RSI", "K", "D", "J"];
+  const indicatorSeries = useMemo(() => {
+    return mainIndicators
+      .map(name => {
+        const seriesData = sortedData
+          .filter(item => item.extra_fields?.[name] != null)
+          .map(item => [
+            new Date(item.date).getTime(),
+            Number(item.extra_fields?.[name])
+          ]) as Array<[number, number]>; 
+
+        if (seriesData.length === 0) return null;
+        return {
+          type: "line" as const,
+          name,
+          data: filterByCutoff(seriesData),
+          lineWidth: 1,
+          yAxis: 0,
+          tooltip: { valueDecimals: 2 },
+        };
+      })
+      .filter(Boolean) as Highcharts.SeriesOptionsType[];
+  }, [sortedData, cutoff]);
+
+
   const priceData = useMemo(() => filterByCutoff(priceDataAll), [priceDataAll, cutoff]);
   const volumeData = useMemo(() => filterByCutoff(volumeDataAll), [volumeDataAll, cutoff]);
   const ma5Data = useMemo(() => filterByCutoff(ma5All), [ma5All, cutoff]);
@@ -230,12 +256,12 @@ export default function StockChart({
     }
 
     try {
-      const chartOptions: any = {
+      const chartOptions: Highcharts.Options = {
         chart: {
           height: 400,
           backgroundColor: "transparent",
         },
-        title: { text: null },
+        title: { text: "stockChart" },
         credits: { enabled: false },
         rangeSelector: { enabled: false },
         scrollbar: { enabled: false },
@@ -244,6 +270,37 @@ export default function StockChart({
           // 强制设置窗口范围（与数据裁剪一致，交互连贯）
           min: isNaN(cutoff) ? undefined : cutoff,
           max: latestTs,
+        },
+        tooltip: {
+          shared: true,
+          formatter: function () {
+            const point = this.points?.[0]?.points as unknown as Highcharts.Point;
+            const extra = sortedData.find(
+              d => new Date(d.date).getTime() === point?.x
+            )?.extra_fields;
+
+            let html = `<b>${Highcharts.dateFormat("%Y-%m-%d", point?.x)}</b><br/>`;
+
+            this.points?.forEach(p => {
+              html += `<span style="color:${p.color}">\u25CF</span> ${p.series.name}: <b>${p.y}</b><br/>`;
+            });
+
+            if (extra) {
+              const tooltipOnly = ["振幅", "涨跌幅", "涨跌额", "换手率"];
+              let hasExtra = false;
+              tooltipOnly.forEach(key => {
+                if (extra[key] != null) {
+                  if (!hasExtra) {
+                    html += `<br/><b>其它指标:</b><br/>`;
+                    hasExtra = true;
+                  }
+                  html += `${key}: ${extra[key]}<br/>`;
+                }
+              });
+            }
+
+            return html;
+          },
         },
         plotOptions: {
           candlestick: {
@@ -268,6 +325,7 @@ export default function StockChart({
           },
         ],
         series: [
+          ...indicatorSeries,
           {
             type: "candlestick",
             name: "股价",

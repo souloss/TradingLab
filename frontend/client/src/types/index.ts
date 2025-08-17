@@ -1,3 +1,6 @@
+interface ExtraFields {
+  [key: string]: number | string | undefined;
+}
 export interface StockData {
   date: string;
   open: number;
@@ -5,6 +8,7 @@ export interface StockData {
   low: number;
   close: number;
   volume: number;
+  extra_fields?: ExtraFields;
 }
 
 export interface ChartPoint {

@@ -128,9 +128,6 @@ class ATRBreakoutStrategyConfig(BaseConfig):
     breakout_period: int = 20
     atr_multiplier: float = 1.5
 
-    confirmation_period: int = 3
-    min_breakout_strength: float = 0.5
-
     # 依赖的指标配置
     atr_config: ATRConfig = field(default_factory=ATRConfig)
 
@@ -142,16 +139,6 @@ class ATRBreakoutStrategyConfig(BaseConfig):
             or self.atr_multiplier <= 0
         ):
             raise ValueError("atr_multiplier must be a positive number")
-        if (
-            not isinstance(self.confirmation_period, int)
-            or self.confirmation_period <= 0
-        ):
-            raise ValueError("confirmation_period must be a positive integer")
-        if (
-            not isinstance(self.min_breakout_strength, (int, float))
-            or self.min_breakout_strength < 0
-        ):
-            raise ValueError("min_breakout_strength must be a non-negative number")
         # 验证依赖的指标配置
         self.atr_config.validate()
 

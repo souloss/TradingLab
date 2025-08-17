@@ -160,46 +160,41 @@ class ATRBreakoutStrategy(TrendStrategy[ATRBreakoutStrategyConfig]):
         signals = pd.Series(SignalType.NEUTRAL.value, index=df.index)
 
         # 获取策略配置
-        config = self.strategy_config  # 类型: ATRBreakoutStrategyConfig
+        config = self.strategy_config
 
-        # 计算近期高低点
-        rolling_high = df["最高"].rolling(window=config.breakout_period).max()
-        rolling_low = df["最低"].rolling(window=config.breakout_period).min()
+        # 计算均值（使用简单移动平均）
+        mean = df["收盘"].rolling(window=config.breakout_period).mean()
 
-        # 计算突破阈值
-        buy_threshold = rolling_high + df["ATR"] * config.atr_multiplier
-        sell_threshold = rolling_low - df["ATR"] * config.atr_multiplier
+        # 计算上下轨
+        upper_band = mean + df["ATR"] * config.atr_multiplier
+        lower_band = mean - df["ATR"] * config.atr_multiplier
 
-        # 突破买入信号
-        buy_breakout = df["收盘"] > buy_threshold
+        # 生成买入信号（价格低于下轨，预期回归均值）
+        buy_signals = df["收盘"] < lower_band
 
-        # 突破卖出信号
-        sell_breakout = df["收盘"] < sell_threshold
-
-        # 确认信号（连续N天保持在突破方向）
-        buy_confirmation = (
-            buy_breakout.rolling(window=config.confirmation_period).sum()
-            == config.confirmation_period
-        )
-        sell_confirmation = (
-            sell_breakout.rolling(window=config.confirmation_period).sum()
-            == config.confirmation_period
-        )
+        # 生成卖出信号（价格高于上轨，预期回归均值）
+        sell_signals = df["收盘"] > upper_band
 
         # 设置信号
-        signals.loc[buy_confirmation] = SignalType.BUY.value
-        signals.loc[sell_confirmation] = SignalType.SELL.value
+        signals.loc[buy_signals] = SignalType.BUY.value
+        signals.loc[sell_signals] = SignalType.SELL.value
 
-        # 计算置信度（基于突破强度）
-        buy_strength = (df["收盘"] - buy_threshold) / (
-            df["ATR"] * config.atr_multiplier
-        )
-        sell_strength = (sell_threshold - df["收盘"]) / (
-            df["ATR"] * config.atr_multiplier
-        )
+        # 计算置信度（基于偏离程度）
+        buy_deviation = (lower_band - df["收盘"]) / (df["ATR"] * config.atr_multiplier)
+        sell_deviation = (df["收盘"] - upper_band) / (df["ATR"] * config.atr_multiplier)
+
         confidence = pd.Series(0.0, index=df.index)
-        confidence.loc[buy_breakout] = buy_strength.loc[buy_breakout].clip(0, 1)
-        confidence.loc[sell_breakout] = sell_strength.loc[sell_breakout].clip(0, 1)
+        confidence.loc[buy_signals] = buy_deviation.loc[buy_signals].clip(0, 1)
+        confidence.loc[sell_signals] = sell_deviation.loc[sell_signals].clip(0, 1)
+
+        # # 添加趋势过滤（可选）
+        # if config.trend_filter:
+        #     # 使用长期均线判断趋势方向
+        #     trend = df["收盘"].rolling(window=config.trend_period).mean()
+        #     # 在下降趋势中只允许买入信号
+        #     signals.loc[(signals == SignalType.SELL.value) & (df["收盘"] < trend)] = SignalType.NEUTRAL.value
+        #     # 在上升趋势中只允许卖出信号
+        #     signals.loc[(signals == SignalType.BUY.value) & (df["收盘"] > trend)] = SignalType.NEUTRAL.value
 
         return SignalResult(
             strategy_name=self.name,
@@ -208,7 +203,6 @@ class ATRBreakoutStrategy(TrendStrategy[ATRBreakoutStrategyConfig]):
             metadata={
                 "breakout_period": config.breakout_period,
                 "atr_multiplier": config.atr_multiplier,
-                "confirmation_period": config.confirmation_period,
             },
         )
 

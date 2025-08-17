@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
 
-from pydantic import (BaseModel, ConfigDict, Field, field_validator,
+from pydantic import (BaseModel, ConfigDict, Field, field_serializer, field_validator,
                       model_validator)
 from pydantic.alias_generators import to_camel  # 官方驼峰生成器
 
@@ -35,8 +35,9 @@ class Trade(BaseModel):
 
 # 图表数据响应模型
 class ChartData(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)  # 允许使用原始名称或别名
-
+    model_config = ConfigDict(
+        populate_by_name=True
+    )
     chart_date: datetime = Field(..., alias="date", description="K线日期")
     open: float = Field(..., description="开盘价")
     high: float = Field(..., description="最高价")
@@ -44,6 +45,10 @@ class ChartData(BaseModel):
     close: float = Field(..., description="收盘价")
     volume: int = Field(..., description="成交量")
 
+    # 新增字段存储未知列
+    extra_fields: Dict[str, Any] = Field(
+        default_factory=dict, description="动态存储的额外字段"
+    )
 
 # 单股回测响应模型
 class BacktestResponse(BaseModel):
@@ -57,14 +62,6 @@ class BacktestResponse(BaseModel):
     trades: List[Trade] = Field(..., description="交易记录")
     chart_data: List[ChartData] = Field(..., alias="chartData", description="图表数据")
     strategies: List[StrategyItem] = Field(..., description="策略配置列表")
-
-    @field_validator("trades", "chart_data", "strategies", mode="before")
-    @classmethod
-    def parse_json(cls, v):
-        if isinstance(v, str):
-            return json.loads(v)
-        return v
-
 
 # 单股回测请求模型
 class BacktestRequest(BaseModel):

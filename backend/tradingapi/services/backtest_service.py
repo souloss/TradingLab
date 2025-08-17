@@ -90,24 +90,26 @@ class BacktestService(BaseService[BacktestResult, BacktestResultRepository]):
             )
         # 准备图表数据
         chart_data = []
-        for _, row in df.iterrows():
-            chart_data.append(
-                ChartData(
-                    chart_date=row.name.to_pydatetime(),  # 假设索引为日期
-                    open=row["开盘"],
-                    high=row["最高"],
-                    low=row["最低"],
-                    close=row["收盘"],
-                    volume=row["成交量"],
-                )
+        known_columns = ["开盘", "最高", "最低", "收盘", "成交量", "股票代码"]
+        chart_data = [
+            ChartData(
+                chart_date=date.to_pydatetime(),
+                open=row["开盘"],
+                high=row["最高"],
+                low=row["最低"],
+                close=row["收盘"],
+                volume=row["成交量"],
+                extra_fields=row.drop(known_columns).to_dict(),  # 未知列转字典
             )
+            for date, row in df.iterrows()
+        ]
         # 获取股票名称（假设有相关服务）
         stock_name = await self.stock_service.get_stock_name_by_code(req.stock_code)
         if not stock_name:
             stock_fetcher: StockInfoFetcher = manager.bind(StockInfoFetcher)
             stock_info = await stock_fetcher.get_all_stock_basic_info()
             await self.stock_service.repo.upsert_many(dataframe_to_stock_data(stock_info), match_fields=["symbol"], auto_commit=True)
-            
+
         stock_name = await self.stock_service.get_stock_name_by_code(req.stock_code)
 
         # 构建回测结果对象（核心实现）
@@ -118,23 +120,17 @@ class BacktestService(BaseService[BacktestResult, BacktestResultRepository]):
                 req.start_date, datetime.min.time()
             ),  # date转datetime
             end_date=datetime.combine(req.end_date, datetime.min.time()),
-            strategies=json.dumps(
-                [s.model_dump(mode="json") for s in req.strategies]
-            ),  # Pydantic转JSON
+            strategies=[s.model_dump(mode="json") for s in req.strategies],
             stock_return=stock_return,
             trade_count=len(trades),
-            trades=json.dumps(
-                [t.model_dump(mode="json") for t in trades]
-            ),  # 交易记录序列化
-            chart_data=json.dumps(
-                [c.model_dump(mode="json") for c in chart_data]
-            ),  # 图表数据序列化
-        )
+            trades=[t.model_dump(mode="json") for t in trades],  
+            chart_data=[c.model_dump(mode="json")for c in chart_data],
+            )
         added_instance = await self.repo.add(backtest_result)  # 添加到会话
         # 关键：显式刷新会话，确保数据写入数据库
         await self.repo.session.commit()
-        resp = BacktestResponse.model_validate(added_instance)
-        # 构建返回对象
+
+        resp = BacktestResponse.model_validate(added_instance)  # ✅ 直接可用
         return resp
 
     async def backtest_batch(
