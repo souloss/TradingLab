@@ -1,3 +1,4 @@
+import sys
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -22,6 +23,35 @@ from tradingapi.core.exceptions import (BusinessException,
 from tradingapi.core.initializer import lifespan
 from tradingapi.core.metrics import metrics_collector, metrics_middleware
 from tradingapi.fetcher.manager import manager
+
+
+def get_static_dir() -> Path:
+    """获取静态文件目录路径"""
+    # 检查是否是打包后的环境
+    if getattr(sys, "frozen", False):
+        # 打包后的路径
+        base_path = Path(sys._MEIPASS)
+    else:
+        # 开发环境路径
+        base_path = Path(__file__).parent
+
+    # 静态文件目录
+    static_dir = base_path / "static" / "public"
+
+    # 如果目录不存在，尝试其他可能的路径
+    if not static_dir.exists():
+        # 尝试相对于可执行文件的路径
+        exe_dir = Path(sys.executable).parent
+        alternative_path = exe_dir / "static" / "public"
+        if alternative_path.exists():
+            static_dir = alternative_path
+
+    return static_dir
+
+
+def is_packaged() -> bool:
+    """检查是否是打包后的应用"""
+    return getattr(sys, "frozen", False)
 
 
 def create_app() -> FastAPI:
@@ -73,9 +103,15 @@ def create_app() -> FastAPI:
         """获取应用指标"""
         return metrics_collector.get_metrics()
 
-    # 最后挂载静态资源
-    static_dir = Path(__file__).with_suffix("").parent / "static" / "public"
-    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+    # 修改静态文件路径处理
+    static_dir = get_static_dir()
+    # 检查静态文件目录是否存在
+    if static_dir.exists():
+        # 挂载静态资源
+        app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+        logger.info(f"Static files mounted from: {static_dir}")
+    else:
+        logger.warning(f"Static files directory not found: {static_dir}")
 
     return app
 
@@ -85,10 +121,22 @@ app = create_app()
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(
-        "tradingapi.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=app_config.DEBUG,
-        log_level="debug" if app_config.DEBUG else "info",
-    )
+    # 检查是否是打包后的应用
+    if is_packaged():
+        # 打包后的应用 - 禁用重载器
+        uvicorn.run(
+            app=app,
+            host="0.0.0.0",
+            port=8000,
+            reload=False,  # 禁用重载器
+            log_level="info",
+        )
+    else:
+        # 开发环境 - 根据配置决定是否启用重载器
+        uvicorn.run(
+            "tradingapi.main:app",
+            host="0.0.0.0",
+            port=8000,
+            reload=app_config.DEBUG,
+            log_level="debug" if app_config.DEBUG else "info",
+        )
