@@ -228,6 +228,14 @@ export default function StockChart({
     return isNaN(cutoff) ? pts : pts.filter((p) => p.x >= cutoff);
   }, [trades, cutoff]);
 
+  const initModule = (mod: any, Highcharts: any) => {
+    if (typeof mod === "function") {
+      mod(Highcharts);
+    } else if (mod?.default && typeof mod.default === "function") {
+      mod.default(Highcharts);
+    }
+  };
+
   // ---- 只加载一次 Highcharts（SSR 安全，且避免 default 导出差异）----
   useEffect(() => {
     let mounted = true;
@@ -235,7 +243,25 @@ export default function StockChart({
       try {
         const mod = await import("highcharts/highstock");
         if (!mounted) return;
-        highchartsRef.current = (mod as any).default || mod;
+        const Highcharts = (mod as any).default || mod;
+
+        // 加载模块
+        const modules = await Promise.all([
+          import("highcharts/modules/full-screen"),
+          import("highcharts/modules/exporting"),
+          import("highcharts/modules/export-data"),
+          import("highcharts/modules/data"),
+          import("highcharts/modules/drag-panes"),
+          import("highcharts/modules/annotations"),
+          import("highcharts/modules/price-indicator"),
+          import("highcharts/modules/stock-tools"),
+          import("highcharts/indicators/indicators-all"),
+        ]);
+
+        // 注册模块到 Highcharts
+        modules.forEach((m) => initModule(m, Highcharts));
+
+        highchartsRef.current = Highcharts;
         setHighchartsLoaded(true);
         setError(null);
       } catch (err) {
@@ -275,11 +301,14 @@ export default function StockChart({
 
     try {
       const chartOptions: Highcharts.Options = {
+        accessibility: {
+          enabled: false,
+        },
         chart: {
           height: 400,
           backgroundColor: "transparent",
         },
-        title: { text: "stockChart" },
+        title: { text: "" },
         credits: { enabled: false },
         rangeSelector: { enabled: false },
         scrollbar: { enabled: false },
