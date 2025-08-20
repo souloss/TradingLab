@@ -26,6 +26,7 @@ import {
     ChevronDown,
 } from "lucide-react";
 import clsx from "clsx";
+import { Input } from "@/components/ui/input"; // shadcn/ui 的输入框
 
 type SortDirection = "asc" | "desc";
 type Mode = "client" | "server";
@@ -91,6 +92,12 @@ export interface PaginatedTableProps<T> {
 
     /** 表格是否紧凑 */
     dense?: boolean;
+
+    filterText?: string;
+    onFilterTextChange?: (v: string) => void;
+
+    /** 自定义过滤逻辑（默认全字段模糊搜索） */
+    filterFn?: (row: T, filterText: string) => boolean;
 }
 
 /** 默认比较：数字/日期优先，否则字符串比较 */
@@ -145,7 +152,67 @@ export function PaginatedTable<T>({
     className,
     pageSizeOptions = [10, 20, 50, 100],
     dense = false,
+    filterText: controlledFilter,
+    onFilterTextChange,
+    filterFn,
 }: PaginatedTableProps<T>) {
+    // ---- 筛选状态 ----
+    const [internalFilter, setInternalFilter] = React.useState("");
+    const filterText = controlledFilter ?? internalFilter;
+
+    function handleFilterChange(v: string) {
+        if (onFilterTextChange) onFilterTextChange(v);
+        else setInternalFilter(v);
+    }
+    
+    function normalizeCellContent(
+        content: React.ReactNode,
+        rowId: string | number,
+        colId: string
+    ): React.ReactNode {
+        if (Array.isArray(content)) {
+            return content.map((child, i) =>
+                React.isValidElement(child)
+                    ? React.cloneElement(child, {
+                        key: child.key ?? `${rowId}-${colId}-${i}`,
+                    })
+                    : <React.Fragment key={`${rowId}-${colId}-${i}`}>{child as any}</React.Fragment>
+            );
+        }
+        return content;
+    }
+
+    function extractText(node: React.ReactNode): string {
+        if (node == null || typeof node === "boolean") return "";
+        if (typeof node === "string" || typeof node === "number") return String(node);
+        if (Array.isArray(node)) return node.map(extractText).join(" ");
+        if (React.isValidElement(node)) return extractText((node.props as any)?.children);
+        return "";
+    }
+
+    function norm(s: string) {
+        return s.toLowerCase().trim();
+    }
+
+    // ---- 过滤数据 ----
+    // 受控/非受控 filterText 省略，沿用你已有的
+    const filteredData = React.useMemo(() => {
+        if (mode === "server") return data;
+        if (!filterText) return data;
+
+        const needle = norm(filterText);
+        return data.filter((row, rowIndex) => {
+            const rowVisibleText = columns
+                .map((col) => {
+                    const raw = col.cell ? col.cell(row, rowIndex) : (getValue(row, col) as React.ReactNode);
+                    return extractText(raw);
+                })
+                .join(" ");
+
+            return norm(rowVisibleText).includes(needle);
+        });
+    }, [mode, data, filterText, columns]);
+
     // ---- 排序状态（受控 / 非受控）----
     const [internalSort, setInternalSort] = React.useState<{ id: string; direction: SortDirection } | null>(
         initialSort ?? null
@@ -193,25 +260,21 @@ export function PaginatedTable<T>({
         }
     }
 
-    // ---- 本地排序 ----
+    // ---- 排序 ----
     const sortedData = React.useMemo(() => {
-        if (mode === "server" || !sortState) return data;
+        if (mode === "server" || !sortState) return filteredData;
         const col = columns.find((c) => c.id === sortState.id);
-        if (!col || !col.sortable) return data;
+        if (!col || !col.sortable) return filteredData;
         const cmp =
             col.sortFn ||
-            ((ra: T, rb: T) => {
-                const va = getValue(ra, col);
-                const vb = getValue(rb, col);
-                return defaultCompare(va, vb);
-            });
+            ((ra: T, rb: T) => defaultCompare(getValue(ra, col), getValue(rb, col)));
 
-        const arr = [...data].sort((a, b) => {
+        const arr = [...filteredData].sort((a, b) => {
             const s = cmp(a, b);
             return sortState.direction === "asc" ? s : -s;
         });
         return arr;
-    }, [mode, data, sortState, columns]);
+    }, [mode, filteredData, sortState, columns]);
 
     // ---- 分页切片（客户端模式）----
     const total = mode === "server" ? (totalItems ?? data.length) : sortedData.length;
@@ -228,6 +291,12 @@ export function PaginatedTable<T>({
         <div className={clsx("space-y-3", className)}>
             {/* 顶部工具条：pageSize 选择 + 排序提示 */}
             <div className="flex items-center justify-between">
+                <Input
+                    placeholder="搜索..."
+                    value={filterText}
+                    onChange={(e) => handleFilterChange(e.target.value)}
+                    className="h-8 w-48"
+                />
                 <div className="text-sm text-muted-foreground">{caption}</div>
                 <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">每页</span>
@@ -295,24 +364,25 @@ export function PaginatedTable<T>({
                             </TableRow>
                         )}
                         {pagedData.map((row, rowIndex) => {
-                            const key = rowKey ? rowKey(row, rowIndex) : rowIndex;
+                            const rowId = rowKey ? rowKey(row, rowIndex) : rowIndex;
                             return (
-                                <TableRow key={key}>
-                                    {columns.map((col) => (
-                                        <TableCell
-                                            key={col.id}
-                                            className={clsx(
-                                                col.className,
-                                                col.align === "center" && "text-center",
-                                                col.align === "right" && "text-right"
-                                            )}
-                                        >
-                                            {col.cell ? col.cell(row, rowIndex) : (() => {
-                                                const v = getValue(row, col);
-                                                return v as any as React.ReactNode;
-                                            })()}
-                                        </TableCell>
-                                    ))}
+                                <TableRow key={rowId}>
+                                    {columns.map((col) => {
+                                        const raw = col.cell ? col.cell(row, rowIndex) : (getValue(row, col) as React.ReactNode);
+                                        const content = normalizeCellContent(raw, rowId, col.id);
+                                        return (
+                                            <TableCell
+                                                key={`${rowId}-${col.id}`}
+                                                className={clsx(
+                                                    col.className,
+                                                    col.align === "center" && "text-center",
+                                                    col.align === "right" && "text-right"
+                                                )}
+                                            >
+                                                {content}
+                                            </TableCell>
+                                        );
+                                    })}
                                 </TableRow>
                             );
                         })}
