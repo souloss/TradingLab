@@ -60,6 +60,9 @@ class BacktestService(BaseService[BacktestResult, BacktestResultRepository]):
         # 创建信号管理器和生成信号
         signal_mgr = create_signal_manager()
         for strategy_item in req.strategies:
+            logger.debug(
+                f"使用策略: {strategy_item}, 参数: {strategy_item.parameters}, to: {strategy_item.parameters.to_strategies_config().to_dict()}"
+            )
             signal_mgr.add_strategy(
                 StrategyConfig(
                     name=strategy_item.type,
@@ -70,7 +73,11 @@ class BacktestService(BaseService[BacktestResult, BacktestResultRepository]):
         df = signal_mgr.generate_signals(df)
         # 执行回测策略
         initial_capital = 100000
-        final_capital, trades_df = backtest_strategy(df)
+        try:
+            final_capital, trades_df = backtest_strategy(df)
+        except Exception as ex:
+            logger.error(f"回测异常：df:{df}")
+            raise ex
         # 计算总收益率
         stock_return = (final_capital - initial_capital) / initial_capital
         # 准备交易记录数据
@@ -126,10 +133,9 @@ class BacktestService(BaseService[BacktestResult, BacktestResultRepository]):
             trades=[t.model_dump(mode="json") for t in trades],  
             chart_data=[c.model_dump(mode="json")for c in chart_data],
             )
-        added_instance = await self.repo.add(backtest_result)  # 添加到会话
-        # 关键：显式刷新会话，确保数据写入数据库
-        await self.repo.session.commit()
-
+        added_instance = await self.repo.add(
+            backtest_result, auto_commit=True
+        )  # 添加到会话
         resp = BacktestResponse.model_validate(added_instance)  # ✅ 直接可用
         return resp
 

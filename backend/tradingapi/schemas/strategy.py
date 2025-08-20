@@ -3,6 +3,7 @@ from typing import Annotated, Literal, Union
 from pydantic import BaseModel, ConfigDict, Field, Tag, model_validator
 from pydantic.alias_generators import to_camel  # 官方驼峰生成器
 
+from tradingapi.strategy.config.indicators import VolumeConfig
 from tradingapi.strategy.config.strategies import (ATRBreakoutStrategyConfig,
                                                    ATRConfig, MACDConfig,
                                                    MACDStrategyConfig,
@@ -138,22 +139,16 @@ class VolumeParameters(BaseModel):
 
     time_range: int = Field(
         default=20,
-        ge=1,
-        le=100,
         description="成交量统计周期",
         json_schema_extra={"examples": [20]},
     )
     buy_volume_multiplier: float = Field(
         default=0.3,
-        ge=0.1,
-        le=5.0,
         description="买入成交量阈值乘数",
         json_schema_extra={"examples": [0.3]},
     )
     sell_volume_multiplier: float = Field(
         default=3.0,
-        ge=1.0,
-        le=10.0,
         description="卖出成交量阈值乘数",
         json_schema_extra={"examples": [3.0]},
     )
@@ -163,6 +158,9 @@ class VolumeParameters(BaseModel):
             high_multiplier=self.sell_volume_multiplier,
             low_multiplier=self.buy_volume_multiplier,
             period=self.time_range,
+            volume_config=VolumeConfig(
+                ma_periods=[self.time_range]
+            )
         )
 
 

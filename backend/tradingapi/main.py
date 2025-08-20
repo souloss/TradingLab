@@ -112,6 +112,10 @@ def create_app() -> FastAPI:
         logger.info(f"Static files mounted from: {static_dir}")
     else:
         logger.warning(f"Static files directory not found: {static_dir}")
+    
+    @app.exception_handler(404)
+    async def not_found(request: Request, exc):
+        return FileResponse(static_dir / "index.html")
 
     return app
 

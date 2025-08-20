@@ -95,7 +95,7 @@ class VolumeSpikeStrategy(MomentumStrategy[VolumeSpikeStrategyConfig]):
         volume_spike = df["成交量"] > df[vol_ma_col] * config.high_multiplier
 
         # 量能萎缩（地量）
-        volume_dip = df["成交量"] < df[vol_ma_col] * config.high_multiplier
+        volume_dip = df["成交量"] < df[vol_ma_col] * config.low_multiplier
 
         # 计算价格位置（用于确认）
 
@@ -106,11 +106,8 @@ class VolumeSpikeStrategy(MomentumStrategy[VolumeSpikeStrategyConfig]):
             df["收盘"].rolling(window=config.period, min_periods=config.period).max()
         )
 
-        # 地量地价买入信号
-        buy_signal = volume_dip & price_min * 0.95
-
-        # 天量天价卖出信号
-        sell_signal = volume_spike & price_max * 1.05
+        buy_signal = volume_dip & (df["收盘"] <= price_min * 1.05)  # 地量地价
+        sell_signal = volume_spike & (df["收盘"] >= price_max * 0.95)  # 天量天价
 
         # 设置信号
         signals.loc[buy_signal] = SignalType.BUY.value
@@ -132,4 +129,4 @@ class VolumeSpikeStrategy(MomentumStrategy[VolumeSpikeStrategyConfig]):
 
     def get_indicator_configs(self) -> Dict[str, BaseConfig]:
         """返回策略依赖的指标配置"""
-        return {"Volume": self.strategy_config.volume_config}
+        return {"VOLUME": self.strategy_config.volume_config}

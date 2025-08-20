@@ -66,15 +66,23 @@ const strategies: StrategyConfig[] = [
 
 export default function IndividualBacktest() {
   const [, setLocation] = useLocation();
-  const [stockCode, setStockCode] = useState("000001");
-  const [startDate, setStartDate] = useState("2024-08-10");
-  const [endDate, setEndDate] = useState("2025-08-10");
-  const [selectedStrategies, setSelectedStrategies] = useState<Set<string>>(new Set([]));
+  const [stockCode, setStockCode] = useState("001335");
+  // 取今天的日期
+  const today = new Date();
+  // 取一年前的同一天
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(today.getFullYear() - 1);
+  // 转成 YYYY-MM-DD 的字符串（本地时区）
+  const formatDate = (date: Date) => date.toISOString().split('T')[0];
+  const [startDate, setStartDate] = useState(formatDate(oneYearAgo));
+  const [endDate, setEndDate] = useState(formatDate(today));
+
+  const [selectedStrategies, setSelectedStrategies] = useState<Set<string>>(new Set(["volume"]));
   const [strategyParameters, setStrategyParameters] = useState<Record<string, Record<string, any>>>({
     macd: { fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 },
     ma: { shortPeriod: 5, longPeriod: 20 },
     atr: { atrPeriod: 14, highLowPeriod: 20, atrMultiplier: 1.5 },
-    volume: { timeRange: 20, buyVolumeMultiplier: 0.3, sellVolumeMultiplier: 3 }
+    volume: { timeRange: 60, buyVolumeMultiplier: 0.4, sellVolumeMultiplier: 3 }
   });
 
   const backtestMutation = useMutation({
