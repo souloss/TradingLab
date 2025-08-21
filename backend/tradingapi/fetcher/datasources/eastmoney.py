@@ -5,6 +5,9 @@ import akshare as ak
 import pandas as pd
 from loguru import logger
 
+from tradingapi.fetcher.interface import OHLCVExtendedSchema
+from tradingapi.models.stock_basic_info import StockBasicInfo
+
 from ..base import DataSourceName, StockDataSource
 from ..manager import manager
 from .exchange import fetch_bj_stocks, fetch_sh_stocks, fetch_sz_stocks
@@ -42,22 +45,25 @@ class EASTMONEY(StockDataSource):
             return False
 
     def _preprocess_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        对股票数据做一些预处理（示例）
-        """
-        # 假设标准化列名
+        # 手转为股
+        df['成交量'] = df['成交量'] * 100
         df = df.rename(
             columns={
-                "日期": "date",
-                "开盘": "open",
-                "收盘": "close",
-                "最高": "high",
-                "最低": "low",
-                "成交量": "volume",
+                "日期": OHLCVExtendedSchema.timestamp,
+                "开盘": OHLCVExtendedSchema.open,
+                "收盘": OHLCVExtendedSchema.close,
+                "最高": OHLCVExtendedSchema.high,
+                "最低": OHLCVExtendedSchema.low,
+                "成交量": OHLCVExtendedSchema.volume,
+                "股票代码": OHLCVExtendedSchema.symbol,
+                "成交额": OHLCVExtendedSchema.trading_value,
+                "振幅": OHLCVExtendedSchema.amplitude,
+                "涨跌幅": OHLCVExtendedSchema.pct_change,
+                "涨跌额": OHLCVExtendedSchema.price_change,
+                "换手率": OHLCVExtendedSchema.turnover_rate,
             }
         )
-        df["date"] = pd.to_datetime(df["date"])
-        return df
+        return OHLCVExtendedSchema.validate(df)
 
     def _clean_numeric_columns(self, stocks: pd.DataFrame):
         numeric_cols = ["总股本", "流通股", "总市值", "流通市值"]
@@ -107,6 +113,30 @@ class EASTMONEY(StockDataSource):
         except Exception as e:
             logger.error(f"获取股票详情失败: {e}")
             return {}
+
+
+    # async def get_stock_basic_info(self, symbol:str, exchange:str=None):
+    #     basic_base_info =  self._fetch_stock_detail(symbol)
+    #     stocks = self._clean_numeric_columns(stocks)
+    #     stocks = self._format_listing_date(stocks)
+    #     stocks = self._log_and_drop_invalid_rows(stocks, required_cols=["名称", "交易所", "板块"])
+
+    #     # 排序列
+    #     final_columns = [
+    #         "交易所",
+    #         "板块",
+    #         "股票类型",
+    #         "证券代码",
+    #         "名称",
+    #         "上市时间",
+    #         "行业",
+    #         "总股本",
+    #         "流通股",
+    #         "总市值",
+    #         "流通市值",
+    #     ]
+    #     return stocks[final_columns]
+
 
     @manager.register_method(weight=1.2, max_requests_per_minute=30, max_concurrent=5)
     async def get_all_stock_basic_info(self):
@@ -163,12 +193,12 @@ class EASTMONEY(StockDataSource):
         return stocks[final_columns]
 
     @manager.register_method(weight=1.2, max_requests_per_minute=30, max_concurrent=5)
-    async def fetch_stock_data(
-        self, stock_code: str, start_date: str, end_date: str
+    async def fetch_stock_daily_data(
+        self, stock: StockBasicInfo, start_date: str, end_date: str
     ) -> pd.DataFrame:
         """
         参数:
-            stock_code: 股票代码
+            stock.symbol: 股票代码
             start_date: 开始日期 (格式 'YYYYMMDD')
             end_date: 结束日期 (格式 'YYYYMMDD')
 
@@ -177,13 +207,13 @@ class EASTMONEY(StockDataSource):
         """
         start_date = start_date.replace("-", "")
         end_date = end_date.replace("-", "")
-        logger.info(f"获取数据: {stock_code} ({start_date} 至 {end_date})")
+        logger.info(f"获取数据: {stock.symbol} ({start_date} 至 {end_date})")
 
         try:
             # akshare 是同步的，这里用 to_thread 包装成异步
             df = await asyncio.to_thread(
                 ak.stock_zh_a_hist,
-                symbol=stock_code,
+                symbol=stock.symbol,
                 period="daily",
                 start_date=start_date,
                 end_date=end_date,
@@ -191,13 +221,14 @@ class EASTMONEY(StockDataSource):
             )
 
             if df.empty:
-                logger.info(f"空数据: {stock_code} ({start_date} 至 {end_date})")
+                logger.info(f"空数据: {stock.symbol} ({start_date} 至 {end_date})")
                 return pd.DataFrame()
 
             df = self._preprocess_data(df)
-            logger.success(f"成功获取: {stock_code} ({len(df)}条记录)")
+            df = df.reindex(columns=list(OHLCVExtendedSchema.to_schema().columns.keys()))
+            logger.success(f"成功获取: {stock.symbol} ({len(df)}条记录)")
             return df
 
         except Exception as e:
-            logger.error(f"数据获取失败: {stock_code} - {str(e)}")
+            logger.error(f"数据获取失败: {stock.symbol} - {str(e)}")
             return pd.DataFrame()

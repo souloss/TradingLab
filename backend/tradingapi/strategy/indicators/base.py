@@ -7,6 +7,8 @@ from typing import Any, Dict, Generic, List, Type, TypeVar
 
 import pandas as pd
 
+from tradingapi.fetcher.interface import OHLCVExtendedSchema
+
 from ..base import IndicatorCategory, IndicatorResult
 from ..config_manager import ConfigManager
 from ..exceptions import IndicatorNotFoundError
@@ -37,7 +39,13 @@ class IndicatorCalculator(ABC, Generic[TConfig]):
 
     def validate_inputs(self, df: pd.DataFrame) -> bool:
         """验证输入数据"""
-        required_columns = ["开盘", "最高", "最低", "收盘", "成交量"]
+        required_columns = [
+            OHLCVExtendedSchema.open,
+            OHLCVExtendedSchema.high,
+            OHLCVExtendedSchema.low,
+            OHLCVExtendedSchema.close,
+            OHLCVExtendedSchema.volume,
+        ]
         return all(col in df.columns for col in required_columns)
 
 

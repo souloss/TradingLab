@@ -8,7 +8,10 @@ class DataSourceName(Enum):
     """数据源名称枚举"""
 
     EASTMONEY = "东方财富"
-    Legulegu = "乐咕乐股"
+    Legulegu  = "乐咕乐股"
+    TX        = "腾讯"
+    Sina      = "新浪"
+    XUEQIU    = "雪球"
 
 
 class StockDataSource(ABC):

@@ -11,7 +11,7 @@ from chinese_calendar import is_holiday
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tradingapi.fetcher.interface import StockInfoFetcher
+from tradingapi.fetcher.interface import OHLCVExtendedSchema, StockInfoFetcher
 from tradingapi.repositories.stock_basic_info import dataframe_to_stock_data
 from tradingapi.fetcher.manager import manager
 from tradingapi.models import BacktestResult
@@ -49,9 +49,12 @@ class BacktestService(BaseService[BacktestResult, BacktestResultRepository]):
 
     # 个股回测
     async def backtest(self, req: BacktestRequest) -> BacktestResponse:
+        stock = await self.stock_service.get_stock_by_code(req.stock_code)
+        if not stock:
+            raise Exception("股票基本信息为空，请加载股票基本信息后回测!")
         # 获取数据
         df = await self.daily_service.get_daily_by_code(
-            req.stock_code, req.start_date, req.end_date
+            stock, req.start_date, req.end_date
         )
         if df.empty:
             logger.warning(f"{req.model_dump()} 请求回测，日线数据为空")
@@ -86,7 +89,7 @@ class BacktestService(BaseService[BacktestResult, BacktestResultRepository]):
             trade_type = TradeType.BUY if row["类型"] == "买入" else TradeType.SELL
             trades.append(
                 Trade(
-                    trade_date=row["日期"].to_pydatetime(),
+                    trade_date=row[OHLCVExtendedSchema.timestamp].to_pydatetime(),
                     type=trade_type,
                     price=row["价格"],
                     quantity=row["股数"],
@@ -97,27 +100,30 @@ class BacktestService(BaseService[BacktestResult, BacktestResultRepository]):
             )
         # 准备图表数据
         chart_data = []
-        known_columns = ["开盘", "最高", "最低", "收盘", "成交量", "股票代码"]
+        known_columns = [
+            OHLCVExtendedSchema.open,
+            OHLCVExtendedSchema.high,
+            OHLCVExtendedSchema.low,
+            OHLCVExtendedSchema.close,
+            OHLCVExtendedSchema.volume,
+            OHLCVExtendedSchema.symbol,
+        ]
         chart_data = [
             ChartData(
                 chart_date=date.to_pydatetime(),
-                open=row["开盘"],
-                high=row["最高"],
-                low=row["最低"],
-                close=row["收盘"],
-                volume=row["成交量"],
+                open=row[OHLCVExtendedSchema.open],
+                high=row[OHLCVExtendedSchema.high],
+                low=row[OHLCVExtendedSchema.low],
+                close=row[OHLCVExtendedSchema.close],
+                volume=row[OHLCVExtendedSchema.volume],
                 extra_fields=row.drop(known_columns).to_dict(),  # 未知列转字典
             )
             for date, row in df.iterrows()
         ]
-        # 获取股票名称（假设有相关服务）
+        # 获取股票名称
         stock_name = await self.stock_service.get_stock_name_by_code(req.stock_code)
         if not stock_name:
-            stock_fetcher: StockInfoFetcher = manager.bind(StockInfoFetcher)
-            stock_info = await stock_fetcher.get_all_stock_basic_info()
-            await self.stock_service.repo.upsert_many(dataframe_to_stock_data(stock_info), match_fields=["symbol"], auto_commit=True)
-
-        stock_name = await self.stock_service.get_stock_name_by_code(req.stock_code)
+            raise Exception(f"stock: {req.stock_code} not exist!")
 
         # 构建回测结果对象（核心实现）
         backtest_result = BacktestResult(
@@ -262,7 +268,7 @@ def backtest_strategy(
 
                 trades.append(
                     {
-                        "日期": dates[i],
+                        OHLCVExtendedSchema.timestamp: dates[i],
                         "类型": "买入",
                         "价格": buy_price,
                         "股数": shares,
@@ -285,7 +291,7 @@ def backtest_strategy(
 
             trades.append(
                 {
-                    "日期": dates[i],
+                    OHLCVExtendedSchema.timestamp: dates[i],
                     "类型": "卖出",
                     "价格": sell_price,
                     "股数": shares,
@@ -306,7 +312,7 @@ def backtest_strategy(
 
         trades.append(
             {
-                "日期": dates[-1],
+                OHLCVExtendedSchema.timestamp: dates[-1],
                 "类型": "平仓",
                 "价格": sell_price,
                 "股数": shares,

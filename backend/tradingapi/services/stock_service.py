@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,3 +39,6 @@ class StocksService:
     async def get_stock_name_by_code(self, code: str) -> str:
         name = await self.repo.get_stock_name_by_symbol(code)
         return name
+    
+    async def get_stock_by_code(self, symbol:str) -> Optional[StockBasicInfo]:
+        return await self.repo.get_stock_by_symbol(symbol)

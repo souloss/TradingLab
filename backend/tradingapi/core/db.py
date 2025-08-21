@@ -94,8 +94,25 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with session_factory() as session:
         try:
             yield session
+            session.commit()
         except Exception:
             await session.rollback()
             raise
         finally:
             await session.close()
+
+
+# 新增：自动提交的 get_session 函数
+@asynccontextmanager
+async def get_session_with_ctx() -> AsyncGenerator[AsyncSession, None]:
+    """获取自动提交的数据库会话"""
+    session_factory = db_manager.get_session_factory()
+    async with session_factory() as session:
+        try:
+            yield session
+            # 正常退出时自动提交
+            await session.commit()
+        except Exception:
+            # 异常时回滚
+            await session.rollback()
+            raise

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tradingapi.fetcher.interface import StockInfoFetcher
 from tradingapi.fetcher.manager import manager
 from tradingapi.models import StockDailyData
+from tradingapi.models.stock_basic_info import StockBasicInfo
 from tradingapi.repositories.stock_basic_info import StockBasicInfoRepository
 from tradingapi.repositories.stock_daily_data import (StockDailyRepository,
                                                       daily_data_to_dataframe)
@@ -22,15 +23,14 @@ class StockDailyService:
 
     # 根据股票代码，日期范围获取日线数据
     async def get_daily_by_code(
-        self, code: str, start_date: date, end_date: date
+        self, stock:StockBasicInfo, start_date: date, end_date: date
     ) -> pd.DataFrame:
         # 1. 日期标准化
         start_dt = pd.to_datetime(start_date)
         end_dt = pd.to_datetime(end_date)
 
         # 2. 尝试从缓存加载数据
-        listing_date = await self.basic_repo.get_listing_date_by_symbol(code)
-        listing_dt = pd.Timestamp(listing_date) if listing_date else None
+        listing_dt = pd.Timestamp(stock.listing_date) if stock.listing_date else None
 
         # 如果请求开始日期早于上市日期，则调整为上市日期
         adjusted_start_dt = max(start_dt, listing_dt) if listing_dt else start_dt
@@ -38,11 +38,11 @@ class StockDailyService:
         # 如果调整后开始日期晚于结束日期，则没有数据
         if adjusted_start_dt > end_dt:
             logger.warning(
-                f"请求日期范围 {start_dt} 至 {end_dt} 早于上市日期 {listing_date}"
+                f"请求日期范围 {start_dt} 至 {end_dt} 早于上市日期 {stock.listing_date}"
             )
             return pd.DataFrame()
-        
-        daily_data = await self.repo.get_daily_data(code, adjusted_start_dt, end_dt)
+
+        daily_data = await self.repo.get_daily_data(stock.symbol, adjusted_start_dt, end_dt)
         cached_df = daily_data_to_dataframe(daily_data)
         missing_days = []
 
@@ -60,7 +60,7 @@ class StockDailyService:
             missing_days = [d for d in trading_days if d not in cached_dates]
             # 如果没有任何交易日缺失，则使用缓存
             if not missing_days:
-                logger.debug(f"缓存满足要求: {code} ({adjusted_start_dt} 至 {end_date})")
+                logger.debug(f"缓存满足要求: {stock.symbol} ({adjusted_start_dt} 至 {end_date})")
                 return _filter_date_range(cached_df, adjusted_start_dt, end_dt).copy()
 
         # 4. 确定需要获取的数据范围
@@ -72,8 +72,8 @@ class StockDailyService:
         logger.debug(f"需要获取缺失数据: {fetch_ranges}, missday:{missing_days}")
 
         tasks = [
-            stock_fetcher.fetch_stock_data(
-                code, fetch_start.isoformat(), fetch_end.isoformat()
+            stock_fetcher.fetch_stock_daily_data(
+                stock, fetch_start.isoformat(), fetch_end.isoformat()
             )
             for fetch_start, fetch_end in fetch_ranges
         ]
@@ -84,9 +84,9 @@ class StockDailyService:
             if isinstance(result, Exception):
                 logger.error(f"获取失败[{fetch_start} - {fetch_end}]: {result}")
             elif result is None or result.empty:
-                logger.warning(f"空数据: {code} ({fetch_start}至{fetch_end})")
+                logger.warning(f"空数据: {stock.symbol} ({fetch_start}至{fetch_end})")
             else:
-                logger.info(f"成功获取: {code} ({fetch_start}至{fetch_end})")
+                logger.info(f"成功获取: {stock.symbol} ({fetch_start}至{fetch_end})")
                 new_dfs.append(result)
 
         # 6. 合并缓存和新数据
