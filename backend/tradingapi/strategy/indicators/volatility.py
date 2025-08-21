@@ -5,9 +5,11 @@
 import numpy as np
 import pandas as pd
 
-from ..base import IndicatorCategory, IndicatorResult
-from ..config import ATRConfig, BollingerBandsConfig, VolumeConfig
-from .base import IndicatorCalculator, register_indicator
+from tradingapi.fetcher.interface import OHLCVExtendedSchema
+
+from tradingapi.strategy.base import IndicatorCategory, IndicatorResult
+from tradingapi.strategy.config import ATRConfig, BollingerBandsConfig, VolumeConfig
+from tradingapi.strategy.indicators.base import IndicatorCalculator, register_indicator
 
 
 @register_indicator("ATR")
@@ -27,9 +29,9 @@ class AverageTrueRange(IndicatorCalculator[ATRConfig]):
         if not self.validate_inputs(df):
             raise ValueError("Invalid input data for ATR calculation")
 
-        high = df["最高"]
-        low = df["最低"]
-        close = df["收盘"]
+        high = df[OHLCVExtendedSchema.high]
+        low = df[OHLCVExtendedSchema.low]
+        close = df[OHLCVExtendedSchema.close]
 
         # 计算真实波幅
         prev_close = close.shift(1)
@@ -67,7 +69,7 @@ class BollingerBands(IndicatorCalculator[BollingerBandsConfig]):
         if not self.validate_inputs(df):
             raise ValueError("Invalid input data for Bollinger Bands calculation")
 
-        close = df["收盘"]
+        close = df[OHLCVExtendedSchema.close]
 
         # 计算中轨（简单移动平均线）
         middle = close.rolling(window=config.period).mean()

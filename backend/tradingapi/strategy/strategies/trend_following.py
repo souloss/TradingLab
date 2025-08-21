@@ -7,12 +7,13 @@ from typing import Dict, List
 import pandas as pd
 from loguru import logger
 
+from tradingapi.fetcher.interface import OHLCVExtendedSchema
 from tradingapi.strategy.config.base import BaseConfig
 
-from ..base import SignalResult, SignalType
-from ..config import (ATRBreakoutStrategyConfig, MACDStrategyConfig,
+from tradingapi.strategy.base import SignalResult, SignalType
+from tradingapi.strategy.config import (ATRBreakoutStrategyConfig, MACDStrategyConfig,
                       MACrossStrategyConfig)
-from .base import TrendStrategy, register_strategy
+from tradingapi.strategy.strategies.base import TrendStrategy, register_strategy
 
 
 @register_strategy("MA")
@@ -163,25 +164,25 @@ class ATRBreakoutStrategy(TrendStrategy[ATRBreakoutStrategyConfig]):
         config = self.strategy_config
 
         # 计算均值（使用简单移动平均）
-        mean = df["收盘"].rolling(window=config.breakout_period).mean()
+        mean = df[OHLCVExtendedSchema.close].rolling(window=config.breakout_period).mean()
 
         # 计算上下轨
         upper_band = mean + df["ATR"] * config.atr_multiplier
         lower_band = mean - df["ATR"] * config.atr_multiplier
 
         # 生成买入信号（价格低于下轨，预期回归均值）
-        buy_signals = df["收盘"] < lower_band
+        buy_signals = df[OHLCVExtendedSchema.close] < lower_band
 
         # 生成卖出信号（价格高于上轨，预期回归均值）
-        sell_signals = df["收盘"] > upper_band
+        sell_signals = df[OHLCVExtendedSchema.close] > upper_band
 
         # 设置信号
         signals.loc[buy_signals] = SignalType.BUY.value
         signals.loc[sell_signals] = SignalType.SELL.value
 
         # 计算置信度（基于偏离程度）
-        buy_deviation = (lower_band - df["收盘"]) / (df["ATR"] * config.atr_multiplier)
-        sell_deviation = (df["收盘"] - upper_band) / (df["ATR"] * config.atr_multiplier)
+        buy_deviation = (lower_band - df[OHLCVExtendedSchema.close]) / (df["ATR"] * config.atr_multiplier)
+        sell_deviation = (df[OHLCVExtendedSchema.close] - upper_band) / (df["ATR"] * config.atr_multiplier)
 
         confidence = pd.Series(0.0, index=df.index)
         confidence.loc[buy_signals] = buy_deviation.loc[buy_signals].clip(0, 1)
@@ -190,11 +191,11 @@ class ATRBreakoutStrategy(TrendStrategy[ATRBreakoutStrategyConfig]):
         # # 添加趋势过滤（可选）
         # if config.trend_filter:
         #     # 使用长期均线判断趋势方向
-        #     trend = df["收盘"].rolling(window=config.trend_period).mean()
+        #     trend = df[OHLCVExtendedSchema.close].rolling(window=config.trend_period).mean()
         #     # 在下降趋势中只允许买入信号
-        #     signals.loc[(signals == SignalType.SELL.value) & (df["收盘"] < trend)] = SignalType.NEUTRAL.value
+        #     signals.loc[(signals == SignalType.SELL.value) & (df[OHLCVExtendedSchema.close] < trend)] = SignalType.NEUTRAL.value
         #     # 在上升趋势中只允许卖出信号
-        #     signals.loc[(signals == SignalType.BUY.value) & (df["收盘"] > trend)] = SignalType.NEUTRAL.value
+        #     signals.loc[(signals == SignalType.BUY.value) & (df[OHLCVExtendedSchema.close] > trend)] = SignalType.NEUTRAL.value
 
         return SignalResult(
             strategy_name=self.name,

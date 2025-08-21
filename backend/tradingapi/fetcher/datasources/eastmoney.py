@@ -44,7 +44,7 @@ class EASTMONEY(StockDataSource):
             logger.error(f"健康检查失败, exception:{ex}")
             return False
 
-    def _preprocess_data(self, df: pd.DataFrame) -> pd.DataFrame:
+    def normalization(self, df: pd.DataFrame) -> pd.DataFrame:
         # 手转为股
         df['成交量'] = df['成交量'] * 100
         df = df.rename(
@@ -63,6 +63,8 @@ class EASTMONEY(StockDataSource):
                 "换手率": OHLCVExtendedSchema.turnover_rate,
             }
         )
+        df = df.set_index(OHLCVExtendedSchema.timestamp)
+        df = df.reindex(columns=list(OHLCVExtendedSchema.to_schema().columns.keys()))
         return OHLCVExtendedSchema.validate(df)
 
     def _clean_numeric_columns(self, stocks: pd.DataFrame):
@@ -74,6 +76,9 @@ class EASTMONEY(StockDataSource):
     def _format_listing_date(self, stocks: pd.DataFrame):
         stocks["上市时间"] = pd.to_datetime(
             stocks["上市时间"], format="%Y%m%d", errors="coerce"
+        )
+        stocks["日期"] = pd.to_datetime(
+            stocks["日期"], format="%Y%m%d", errors="coerce"
         )
         # 将 NaT 转为 None，Timestamp 转为 date
         stocks["上市时间"] = stocks["上市时间"].apply(lambda x: x.date() if pd.notna(x) else None)
@@ -114,7 +119,6 @@ class EASTMONEY(StockDataSource):
             logger.error(f"获取股票详情失败: {e}")
             return {}
 
-
     # async def get_stock_basic_info(self, symbol:str, exchange:str=None):
     #     basic_base_info =  self._fetch_stock_detail(symbol)
     #     stocks = self._clean_numeric_columns(stocks)
@@ -136,7 +140,6 @@ class EASTMONEY(StockDataSource):
     #         "流通市值",
     #     ]
     #     return stocks[final_columns]
-
 
     @manager.register_method(weight=1.2, max_requests_per_minute=30, max_concurrent=5)
     async def get_all_stock_basic_info(self):
@@ -224,8 +227,7 @@ class EASTMONEY(StockDataSource):
                 logger.info(f"空数据: {stock.symbol} ({start_date} 至 {end_date})")
                 return pd.DataFrame()
 
-            df = self._preprocess_data(df)
-            df = df.reindex(columns=list(OHLCVExtendedSchema.to_schema().columns.keys()))
+            df = self.normalization(df)
             logger.success(f"成功获取: {stock.symbol} ({len(df)}条记录)")
             return df
 

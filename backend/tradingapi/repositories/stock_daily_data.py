@@ -37,7 +37,7 @@ class StockDailyRepository(BaseRepository[StockDailyData]):
 
     async def upsert_stock_dailys_bydf(self, df:pd.DataFrame):
         datas = dataframe_to_daily_data(df)
-        return await self.upsert_many(datas, auto_commit=True)
+        return await self.bulk_upsert(datas, conflict_columns=[StockDailyData.symbol, StockDailyData.trade_date])
 
 
 def dataframe_to_daily_data(df: pd.DataFrame) -> List[StockDailyData]:
@@ -67,10 +67,6 @@ def dataframe_to_daily_data(df: pd.DataFrame) -> List[StockDailyData]:
         missing = [col for col in required_columns if col not in df.columns]
         raise ValueError(f"DataFrame {df.columns}, {df.index} 缺少必要的列: {missing}")
 
-    # # 确保索引是日期类型
-    # if not isinstance(df.index, pd.DatetimeIndex):
-    #     raise TypeError("DataFrame 索引必须是 DatetimeIndex 类型")
-
     # 创建存储结果的列表
     daily_data_list = []
     # 遍历 DataFrame 的每一行
@@ -79,7 +75,7 @@ def dataframe_to_daily_data(df: pd.DataFrame) -> List[StockDailyData]:
         # 创建 StockDailyData 对象并添加到列表
         daily_data = StockDailyData(
             symbol=row[OHLCVExtendedSchema.symbol],
-            trade_date=row[OHLCVExtendedSchema.timestamp].to_pydatetime().date(),
+            trade_date=idx.to_pydatetime().date(),
             open_price=row[OHLCVExtendedSchema.open],
             close_price=row[OHLCVExtendedSchema.close],
             high_price=row[OHLCVExtendedSchema.high],
@@ -135,8 +131,11 @@ def daily_data_to_dataframe(daily_data_list: List[StockDailyData]):
 
     # 创建 DataFrame
     df = pd.DataFrame(data)
-    # 设置日期索引
-    df.index = pd.to_datetime(dates, name=OHLCVExtendedSchema.timestamp)
+    # 创建日期索引并设置名称
+    date_index = pd.to_datetime(dates)
+    date_index.name = OHLCVExtendedSchema.timestamp
+    df.index = date_index
+
     # 设置正确的数据类型
     dtypes = {
         OHLCVExtendedSchema.symbol: "object",

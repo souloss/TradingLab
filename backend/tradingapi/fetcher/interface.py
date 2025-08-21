@@ -1,5 +1,5 @@
 from typing import Protocol
-from pandera.typing import Series, DataFrame
+from pandera.typing import Series, DataFrame, Index
 import pandera.extensions as extensions
 
 import pandas as pd
@@ -9,7 +9,9 @@ from tradingapi.models.stock_basic_info import StockBasicInfo
 
 class OHLCVSchema(pa.DataFrameModel):
     # 时间戳索引（主键）
-    timestamp: Series[pa.DateTime] = pa.Field(unique=True, coerce=True, default="时间")
+    timestamp: Index[pa.DateTime] = pa.Field(
+        unique=True, coerce=True, description="时间索引"
+    )
 
     # 价格列（需为正浮点数）
     open: Series[pa.Float] = pa.Field(gt=0, description="开盘价")

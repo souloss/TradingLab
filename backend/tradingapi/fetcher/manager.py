@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import random
 import weakref
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -103,15 +104,31 @@ class ServiceMethod:
     def choose_implementation(self) -> Optional[Tuple[StockDataSource, MethodRegistry]]:
         """根据策略选择最佳实现"""
         available = [(src, reg) for src, reg in self.implementations if src.is_healthy]
+        logger.debug(f"选择最佳数据源...，目前可用数据源：{available}")
         if not available:
             return None
 
-        def score(reg: MethodRegistry):
+        # 计算每个实现的得分
+        scores = []
+        for src, reg in available:
             load_penalty = 1.0 / (1.0 + len(reg.active_tasks))
-            return reg.weight * reg.success_rate * load_penalty
+            score = reg.weight * reg.success_rate * load_penalty
+            scores.append((src, reg, score))
 
-        best = max(available, key=lambda pair: score(pair[1]))
-        return best
+        logger.debug(f"计算出数据源得分:{scores}")
+        total = sum(score for _, _, score in scores)
+        if total <= 0:
+            return random.choice(available)  # fallback：全部分数为0时随机挑一个
+
+        # 加权随机选择
+        r = random.uniform(0, total)
+        upto = 0
+        for src, reg, score in scores:
+            upto += score
+            if upto >= r:
+                return src, reg
+
+        return available[-1]  # 理论上不会走到这里
 
     async def call(
         self,

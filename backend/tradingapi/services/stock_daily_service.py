@@ -52,7 +52,7 @@ class StockDailyService:
             cache_min = cached_df.index.min()
             cache_max = cached_df.index.max()
 
-            req_dates = pd.date_range(start=cache_min, end=cache_max, freq="B")
+            req_dates = pd.date_range(start=adjusted_start_dt, end=end_dt, freq="B")
             # 进一步排除节假日（传入节假日列表）
             trading_days = [d for d in req_dates if is_trading_day(d.to_pydatetime())]
             # 3.2 检查缓存是否覆盖所有交易日

@@ -44,7 +44,7 @@ class TX(StockDataSource):
             logger.error(f"健康检查失败, exception:{ex}")
             return False
 
-    def _preprocess_data(self, df: pd.DataFrame) -> pd.DataFrame:
+    def normalization(self, df: pd.DataFrame, symbol:str) -> pd.DataFrame:
         # 1手=100股
         df['amount'] = df['amount'] * 100
         df = df.rename(
@@ -65,6 +65,11 @@ class TX(StockDataSource):
             if col not in df.columns:
                 df[col] = 0
 
+        df[OHLCVExtendedSchema.symbol] = symbol
+        df = df.set_index(OHLCVExtendedSchema.timestamp)
+        df = df.reindex(
+                columns=list(OHLCVExtendedSchema.to_schema().columns.keys())
+            )
         return OHLCVExtendedSchema.validate(df)
 
     @manager.register_method(weight=1.2, max_requests_per_minute=30, max_concurrent=5)
@@ -98,9 +103,7 @@ class TX(StockDataSource):
                 logger.info(f"空数据: {stock.symbol} ({start_date} 至 {end_date})")
                 return pd.DataFrame()
 
-            df = self._preprocess_data(df)
-            df[OHLCVExtendedSchema.symbol] = stock.symbol
-            df = df.reindex(columns=list(OHLCVExtendedSchema.to_schema().columns.keys()))
+            df = self.normalization(df, stock.symbol)
             logger.success(f"成功获取: {stock.symbol} ({len(df)}条记录)")
             return df
 

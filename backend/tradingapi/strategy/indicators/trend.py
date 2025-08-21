@@ -4,8 +4,10 @@
 
 import pandas as pd
 
-from ..config import EMAConfig, MAConfig
-from .base import (IndicatorCalculator, IndicatorCategory, IndicatorResult,
+from tradingapi.fetcher.interface import OHLCVExtendedSchema
+
+from tradingapi.strategy.config import EMAConfig, MAConfig
+from tradingapi.strategy.indicators.base import (IndicatorCalculator, IndicatorCategory, IndicatorResult,
                    register_indicator)
 
 
@@ -26,7 +28,7 @@ class MovingAverage(IndicatorCalculator[MAConfig]):
         if not self.validate_inputs(df):
             raise ValueError("Invalid input data for MA calculation")
 
-        close_prices = df["收盘"]
+        close_prices = df[OHLCVExtendedSchema.close]
 
         # 计算各期移动平均线
         result_dict = {}
@@ -57,7 +59,7 @@ class ExponentialMovingAverage(IndicatorCalculator[EMAConfig]):
         if not self.validate_inputs(df):
             raise ValueError("Invalid input data for EMA calculation")
 
-        close_prices = df["收盘"]
+        close_prices = df[OHLCVExtendedSchema.close]
 
         # 计算各期指数移动平均线
         result_dict = {}

@@ -7,11 +7,12 @@ from typing import Any, Dict, List
 import pandas as pd
 from loguru import logger
 
+from tradingapi.fetcher.interface import OHLCVExtendedSchema
 from tradingapi.strategy.config.base import BaseConfig
 
-from ..base import SignalResult, SignalType
-from ..config import BollingerBandsStrategyConfig
-from .base import MeanReversionStrategy, register_strategy
+from tradingapi.strategy.base import SignalResult, SignalType
+from tradingapi.strategy.config import BollingerBandsStrategyConfig
+from tradingapi.strategy.strategies.base import MeanReversionStrategy, register_strategy
 
 
 @register_strategy("BollingerBands")
@@ -35,7 +36,7 @@ class BollingerBandsStrategy(MeanReversionStrategy[BollingerBandsStrategyConfig]
 
         # 计算Z分数（价格相对于布林带的位置）
         bb_width = df["BB_Upper"] - df["BB_Lower"]
-        z_score = (df["收盘"] - df["BB_Middle"]) / (bb_width / 2)
+        z_score = (df[OHLCVExtendedSchema.close] - df["BB_Middle"]) / (bb_width / 2)
 
         # 生成信号
         buy_signal = z_score < -config.entry_threshold

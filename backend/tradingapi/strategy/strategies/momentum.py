@@ -7,11 +7,12 @@ from typing import Dict, List
 import pandas as pd
 from loguru import logger
 
+from tradingapi.fetcher.interface import OHLCVExtendedSchema
 from tradingapi.strategy.config.base import BaseConfig
 
-from ..base import SignalResult, SignalType
-from ..config import RSIStrategyConfig, VolumeSpikeStrategyConfig
-from .base import MomentumStrategy, register_strategy
+from tradingapi.strategy.base import SignalResult, SignalType
+from tradingapi.strategy.config import RSIStrategyConfig, VolumeSpikeStrategyConfig
+from tradingapi.strategy.strategies.base import MomentumStrategy, register_strategy
 
 
 @register_strategy("RSI")
@@ -92,22 +93,22 @@ class VolumeSpikeStrategy(MomentumStrategy[VolumeSpikeStrategyConfig]):
         vol_ma_col = f"Vol_MA{config.period}"
 
         # 量能放大（天量）
-        volume_spike = df["成交量"] > df[vol_ma_col] * config.high_multiplier
+        volume_spike = df[OHLCVExtendedSchema.volume] > df[vol_ma_col] * config.high_multiplier
 
         # 量能萎缩（地量）
-        volume_dip = df["成交量"] < df[vol_ma_col] * config.low_multiplier
+        volume_dip = df[OHLCVExtendedSchema.volume] < df[vol_ma_col] * config.low_multiplier
 
         # 计算价格位置（用于确认）
 
         price_min = (
-            df["收盘"].rolling(window=config.period, min_periods=config.period).min()
+            df[OHLCVExtendedSchema.close].rolling(window=config.period, min_periods=config.period).min()
         )
         price_max = (
-            df["收盘"].rolling(window=config.period, min_periods=config.period).max()
+            df[OHLCVExtendedSchema.close].rolling(window=config.period, min_periods=config.period).max()
         )
 
-        buy_signal = volume_dip & (df["收盘"] <= price_min * 1.05)  # 地量地价
-        sell_signal = volume_spike & (df["收盘"] >= price_max * 0.95)  # 天量天价
+        buy_signal = volume_dip & (df[OHLCVExtendedSchema.close] <= price_min * 1.05)  # 地量地价
+        sell_signal = volume_spike & (df[OHLCVExtendedSchema.close] >= price_max * 0.95)  # 天量天价
 
         # 设置信号
         signals.loc[buy_signal] = SignalType.BUY.value

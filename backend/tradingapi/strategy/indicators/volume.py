@@ -4,9 +4,11 @@
 
 import pandas as pd
 
-from ..base import IndicatorCategory, IndicatorResult
-from ..config import VolumeConfig
-from .base import IndicatorCalculator, register_indicator
+from tradingapi.fetcher.interface import OHLCVExtendedSchema
+
+from tradingapi.strategy.base import IndicatorCategory, IndicatorResult
+from tradingapi.strategy.config import VolumeConfig
+from tradingapi.strategy.indicators.base import IndicatorCalculator, register_indicator
 
 
 @register_indicator("VOLUME")
@@ -26,7 +28,7 @@ class VolumeIndicator(IndicatorCalculator[VolumeConfig]):
         if not self.validate_inputs(df):
             raise ValueError("Invalid input data for Volume calculation")
 
-        volume = df["成交量"]
+        volume = df[OHLCVExtendedSchema.volume]
 
         # 计算各期移动平均线
         result_dict = {"Volume": volume}

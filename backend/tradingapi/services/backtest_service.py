@@ -243,7 +243,7 @@ def backtest_strategy(
     trades = []
 
     # 预提取数据提高效率
-    close_prices = df["收盘"].values
+    close_prices = df[OHLCVExtendedSchema.close].values
     signals = df["Signal_Combined"].values
     dates = df.index
 

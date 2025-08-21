@@ -8,12 +8,14 @@ from typing import Dict, Generic, List, Optional, Type, TypeVar
 import pandas as pd
 from loguru import logger
 
-from ..base import SignalResult, SignalType, StrategyConfig
-from ..config import BaseConfig
-from ..config_manager import ConfigManager
-from ..exceptions import (ConfigurationError, StrategyError,
+from tradingapi.fetcher.interface import OHLCVExtendedSchema
+
+from tradingapi.strategy.base import SignalResult, SignalType, StrategyConfig
+from tradingapi.strategy.config import BaseConfig
+from tradingapi.strategy.config_manager import ConfigManager
+from tradingapi.strategy.exceptions import (ConfigurationError, StrategyError,
                           StrategyNotFoundError)
-from ..manager import IndicatorManager
+from tradingapi.strategy.manager import IndicatorManager
 
 
 class StrategyRegistry:
@@ -174,7 +176,7 @@ class TrendStrategy(StrategyBase[TStrategyConfig]):
     ) -> pd.Series:
         """趋势策略默认置信度计算"""
         # 使用价格变化率作为置信度
-        price_change = df["收盘"].pct_change().abs()
+        price_change = df[OHLCVExtendedSchema.close].pct_change().abs()
         confidence = price_change.clip(0, 1)  # 限制在0-1范围
         return confidence.fillna(0)
 
