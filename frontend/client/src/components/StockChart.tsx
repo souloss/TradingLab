@@ -32,6 +32,36 @@ const calculateMA = (data: Tick[], period: number): Array<[number, number]> => {
   return result;
 };
 
+type OHLC = { date: string | Date; high: number; low: number; close: number };
+
+const calculateATR = (data: OHLC[], period = 14): Array<[number, number]> => {
+  if (data.length < period + 1) return [];
+  const result: Array<[number, number]> = [];
+  const trs: number[] = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const prevClose = data[i - 1].close;
+    const high = data[i].high;
+    const low = data[i].low;
+
+    const tr = Math.max(
+      high - low,
+      Math.abs(high - prevClose),
+      Math.abs(low - prevClose)
+    );
+    trs.push(tr);
+
+    if (trs.length >= period) {
+      const atr = trs.slice(-period).reduce((a, b) => a + b, 0) / period;
+      result.push([
+        new Date(data[i].date).getTime(),
+        Math.round(atr * 100) / 100,
+      ]);
+    }
+  }
+  return result;
+};
+
 const getRangeMs = (period: string): number => {
   const day = 24 * 60 * 60 * 1000;
   switch (period) {
@@ -129,6 +159,37 @@ export default function StockChart({
     () => calculateMA(sortedData as unknown as Tick[], 20),
     [sortedData]
   );
+  const atrAll = useMemo(
+    () => calculateATR(sortedData as unknown as OHLC[], 14),
+    [sortedData]
+  );
+
+  const atrLast = useMemo(() => {
+    const atrAll = calculateATR(sortedData as unknown as OHLC[], 14);
+    return atrAll.length > 0 ? atrAll[atrAll.length - 1][1] : null;
+  }, [sortedData]);
+  
+  const [stopLossLine, stopWinLine] = useMemo(() => {
+    if (!atrLast || sortedData.length === 0) return [[], []];
+
+    const firstTs = new Date(sortedData[0].date).getTime();
+    const lastTs = new Date(sortedData[sortedData.length - 1].date).getTime();
+    const lastClose = sortedData[sortedData.length - 1].close;
+
+    const stopLoss = lastClose - atrLast * 1.5;
+    const stopWin = lastClose + atrLast * 3;
+
+    return [
+      [
+        [firstTs, stopLoss],
+        [lastTs, stopLoss],
+      ],
+      [
+        [firstTs, stopWin],
+        [lastTs, stopWin],
+      ],
+    ];
+  }, [atrLast, sortedData]);
 
   // 根据 selectedPeriod 裁剪窗口数据
   const filterByCutoff = <T extends [number, ...any[]]>(arr: T[]) =>
@@ -182,6 +243,8 @@ export default function StockChart({
   const ma5Data = useMemo(() => filterByCutoff(ma5All), [ma5All, cutoff]);
   const ma10Data = useMemo(() => filterByCutoff(ma10All), [ma10All, cutoff]);
   const ma20Data = useMemo(() => filterByCutoff(ma20All), [ma20All, cutoff]);
+
+  const atrData = useMemo(() => filterByCutoff(atrAll), [atrAll, cutoff]);
 
   // 交易信号（仅 BUY/SELL，且按窗口裁剪）
   const buyPoints = useMemo(() => {
@@ -418,6 +481,24 @@ export default function StockChart({
             name: "成交量",
             data: volumeData,
             yAxis: 1,
+          },
+          {
+            type: "line",
+            name: "止损线",
+            data: stopLossLine,
+            color: "#3b82f6", // 蓝色
+            dashStyle: "Dash",
+            lineWidth: 1.5,
+            yAxis: 0,
+          },
+          {
+            type: "line",
+            name: "止盈线",
+            data: stopWinLine,
+            color: "#ef4444", // 红色
+            dashStyle: "Dash",
+            lineWidth: 1.5,
+            yAxis: 0,
           },
           ...indicatorSeries,
         ],

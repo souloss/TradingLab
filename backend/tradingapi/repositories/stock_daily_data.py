@@ -7,6 +7,7 @@ from sqlalchemy import Column, DateTime, UniqueConstraint, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import Field, SQLModel
 
+from tradingapi.fetcher.interface import OHLCVExtendedSchema
 from tradingapi.models.stock_daily_data import StockDailyData
 from tradingapi.repositories.base import BaseRepository
 
@@ -48,17 +49,18 @@ def dataframe_to_daily_data(df: pd.DataFrame) -> List[StockDailyData]:
     """
     # 确保 DataFrame 包含所有必要的列
     required_columns = [
-        "股票代码",
-        "open",
-        "close",
-        "high",
-        "low",
-        "volume",
-        "成交额",
-        "振幅",
-        "涨跌幅",
-        "涨跌额",
-        "换手率",
+        OHLCVExtendedSchema.timestamp,
+        OHLCVExtendedSchema.symbol,
+        OHLCVExtendedSchema.open,
+        OHLCVExtendedSchema.close,
+        OHLCVExtendedSchema.high,
+        OHLCVExtendedSchema.low,
+        OHLCVExtendedSchema.volume,
+        OHLCVExtendedSchema.trading_value,
+        OHLCVExtendedSchema.amplitude,
+        OHLCVExtendedSchema.pct_change,
+        OHLCVExtendedSchema.price_change,
+        OHLCVExtendedSchema.turnover_rate,
     ]
 
     if not all(col in df.columns for col in required_columns):
@@ -76,18 +78,18 @@ def dataframe_to_daily_data(df: pd.DataFrame) -> List[StockDailyData]:
         # 将索引转换为日期对象
         # 创建 StockDailyData 对象并添加到列表
         daily_data = StockDailyData(
-            symbol=row["股票代码"],
-            trade_date=row["date"].to_pydatetime().date(),
-            open_price=row["open"],
-            close_price=row["close"],
-            high_price=row["high"],
-            low_price=row["low"],
-            volume=row["volume"],
-            turnover=row["成交额"],
-            amplitude=row["振幅"],
-            change_rate=row["涨跌幅"],
-            change_amount=row["涨跌额"],
-            turnover_rate=row["换手率"],
+            symbol=row[OHLCVExtendedSchema.symbol],
+            trade_date=row[OHLCVExtendedSchema.timestamp].to_pydatetime().date(),
+            open_price=row[OHLCVExtendedSchema.open],
+            close_price=row[OHLCVExtendedSchema.close],
+            high_price=row[OHLCVExtendedSchema.high],
+            low_price=row[OHLCVExtendedSchema.low],
+            volume=row[OHLCVExtendedSchema.volume],
+            turnover=row[OHLCVExtendedSchema.trading_value],
+            amplitude=row[OHLCVExtendedSchema.amplitude],
+            change_rate=row[OHLCVExtendedSchema.pct_change],
+            change_amount=row[OHLCVExtendedSchema.price_change],
+            turnover_rate=row[OHLCVExtendedSchema.turnover_rate],
         )
         daily_data_list.append(daily_data)
 
@@ -101,53 +103,53 @@ def daily_data_to_dataframe(daily_data_list: List[StockDailyData]):
     """
     # 创建空列表存储数据
     data = {
-        "股票代码": [],
-        "开盘": [],
-        "收盘": [],
-        "最高": [],
-        "最低": [],
-        "成交量": [],
-        "成交额": [],
-        "振幅": [],
-        "涨跌幅": [],
-        "涨跌额": [],
-        "换手率": [],
+        OHLCVExtendedSchema.symbol: [],
+        OHLCVExtendedSchema.open: [],
+        OHLCVExtendedSchema.close: [],
+        OHLCVExtendedSchema.high: [],
+        OHLCVExtendedSchema.low: [],
+        OHLCVExtendedSchema.volume: [],
+        OHLCVExtendedSchema.trading_value: [],
+        OHLCVExtendedSchema.amplitude: [],
+        OHLCVExtendedSchema.pct_change: [],
+        OHLCVExtendedSchema.price_change: [],
+        OHLCVExtendedSchema.turnover_rate: [],
     }
     # 日期索引列表
     dates = []
 
     # 填充数据
     for daily_data in daily_data_list:
-        data["股票代码"].append(daily_data.symbol)
-        data["开盘"].append(daily_data.open_price)
-        data["收盘"].append(daily_data.close_price)
-        data["最高"].append(daily_data.high_price)
-        data["最低"].append(daily_data.low_price)
-        data["振幅"].append(daily_data.amplitude)
-        data["涨跌幅"].append(daily_data.change_rate)
-        data["涨跌额"].append(daily_data.change_amount)
-        data["换手率"].append(daily_data.turnover_rate)
-        data["成交量"].append(daily_data.volume)
-        data["成交额"].append(daily_data.turnover)
+        data[OHLCVExtendedSchema.symbol].append(daily_data.symbol)
+        data[OHLCVExtendedSchema.open].append(daily_data.open_price)
+        data[OHLCVExtendedSchema.close].append(daily_data.close_price)
+        data[OHLCVExtendedSchema.high].append(daily_data.high_price)
+        data[OHLCVExtendedSchema.low].append(daily_data.low_price)
+        data[OHLCVExtendedSchema.amplitude].append(daily_data.amplitude)
+        data[OHLCVExtendedSchema.pct_change].append(daily_data.change_rate)
+        data[OHLCVExtendedSchema.price_change].append(daily_data.change_amount)
+        data[OHLCVExtendedSchema.turnover_rate].append(daily_data.turnover_rate)
+        data[OHLCVExtendedSchema.volume].append(daily_data.volume)
+        data[OHLCVExtendedSchema.trading_value].append(daily_data.turnover)
         dates.append(daily_data.trade_date)
 
     # 创建 DataFrame
     df = pd.DataFrame(data)
     # 设置日期索引
-    df.index = pd.DatetimeIndex(dates, name="日期")
+    df.index = pd.to_datetime(dates, name=OHLCVExtendedSchema.timestamp)
     # 设置正确的数据类型
     dtypes = {
-        "股票代码": "object",
-        "开盘": "float64",
-        "收盘": "float64",
-        "最高": "float64",
-        "最低": "float64",
-        "成交量": "int64",
-        "成交额": "float64",
-        "振幅": "float64",
-        "涨跌幅": "float64",
-        "涨跌额": "float64",
-        "换手率": "float64",
+        OHLCVExtendedSchema.symbol: "object",
+        OHLCVExtendedSchema.open: "float64",
+        OHLCVExtendedSchema.close: "float64",
+        OHLCVExtendedSchema.high: "float64",
+        OHLCVExtendedSchema.low: "float64",
+        OHLCVExtendedSchema.volume: "int64",
+        OHLCVExtendedSchema.trading_value: "float64",
+        OHLCVExtendedSchema.amplitude: "float64",
+        OHLCVExtendedSchema.pct_change: "float64",
+        OHLCVExtendedSchema.price_change: "float64",
+        OHLCVExtendedSchema.turnover_rate: "float64",
     }
     for col, dtype in dtypes.items():
         df[col] = df[col].astype(dtype)

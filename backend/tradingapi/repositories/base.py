@@ -23,10 +23,10 @@ class BaseRepository(SQLAlchemyAsyncRepository[ModelType], Generic[ModelType]):
         return await self.get(id)
 
     async def get_all(
-        self, limit: Optional[int] = None, offset: Optional[int] = None
+        self
     ) -> Sequence[ModelType]:
         """获取所有记录"""
-        return await self.list(limit=limit, offset=offset)
+        return await self.list()
 
     async def get_count(self) -> int:
         """获取记录总数"""

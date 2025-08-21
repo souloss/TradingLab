@@ -9,6 +9,7 @@ dependencies = [
     "aiolimiter>=1.2.1",
     "aiosqlite>=0.21.0",
     "akshare>=1.17.31",
+    "apscheduler>=3.11.0",
     "backtesting>=0.6.5",
     "black>=25.1.0",
     "chinese-calendar>=1.10.0",
