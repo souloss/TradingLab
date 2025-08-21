@@ -126,6 +126,43 @@ class BaseRepository(Generic[ModelType]):
         await self.delete(obj)
         return True
 
+    async def upsert(
+        self,
+        obj: ModelType,
+        conflict_columns: Optional[Sequence[str]] = None,
+        update_columns: Optional[Sequence[str]] = None,
+    ) -> ModelType:
+        """
+        SQLite 单条 UPSERT
+        - conflict_columns：冲突列，默认主键
+        - update_columns：需要更新的列，默认除冲突列外的所有列
+        """
+        if obj is None:
+            return obj
+
+        # 获取表元信息
+        table = inspect(self.model_type).tables[0]
+        pk_columns = [col.name for col in table.primary_key]
+
+        # 冲突列：用户未传则用主键
+        conflict_cols = conflict_columns or pk_columns
+
+        # 可更新列：用户未传则用非冲突列
+        all_columns = [col.name for col in table.columns]
+        update_cols = update_columns or [
+            c for c in all_columns if c not in conflict_cols
+        ]
+
+        stmt = insert(self.model_type).values(obj.model_dump())
+        stmt = stmt.on_conflict_do_update(
+            index_elements=conflict_cols,
+            set_={col: getattr(stmt.excluded, col) for col in update_cols},
+        )
+
+        await self.session.execute(stmt)
+        await self.session.commit()
+        return obj
+
     # --------------------
     # 批量操作
     # --------------------
@@ -148,7 +185,6 @@ class BaseRepository(Generic[ModelType]):
             await self.session.flush()
         await self.session.commit()
         return objs
-
 
     async def bulk_upsert(
         self,

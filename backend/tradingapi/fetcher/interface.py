@@ -80,6 +80,8 @@ class StockInfoFetcher(Protocol):
 
     async def get_all_stock_basic_info(self): ...
 
+    async def get_stock_basic_info(self, exchange, symbol):...
+
     @pa.check_types
     async def fetch_stock_daily_data(
         self, stock: StockBasicInfo, start_date: str, end_date: str

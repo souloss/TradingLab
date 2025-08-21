@@ -1,8 +1,6 @@
 import asyncio
 import inspect
 import random
-import weakref
-from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import partial, wraps
 from types import SimpleNamespace
@@ -136,7 +134,7 @@ class ServiceMethod:
         limiter: Optional[AsyncLimiter] = None,
         semaphore: Optional[asyncio.Semaphore] = None,
         timeout: Optional[float] = None,
-        retries: int = 0,
+        retries: int = 10,
         **kwargs,
     ) -> Any:
         impl = self.choose_implementation()

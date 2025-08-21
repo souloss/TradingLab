@@ -68,3 +68,10 @@ async def fetch_bj_stocks():
         return bj_stocks[["交易所", "股票类型", "证券代码", "板块"]]
 
     return await asyncio.to_thread(_fetch)
+
+async def fetch_all_stocks():
+    sz, sh, bj = await asyncio.gather(
+        fetch_sz_stocks(), fetch_sh_stocks(), fetch_bj_stocks()
+    )
+    stocks = pd.concat([sz, sh, bj], ignore_index=True)
+    return stocks

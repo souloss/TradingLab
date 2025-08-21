@@ -18,6 +18,7 @@ class AppConfig(BaseSettings):
     # SQLite 数据库配置
     SQLITE_DB_PATH: str = Field("stock_data.db")
     SQLITE_ASYNC_DRIVER: str = Field("sqlite+aiosqlite")
+    SQLITE_SYNC_DRIVER: str = Field("sqlite")
 
     # API配置
     # API_PREFIX: str = Field("/api")

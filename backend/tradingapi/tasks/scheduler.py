@@ -4,6 +4,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.jobstores.memory import MemoryJobStore
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.executors.asyncio import AsyncIOExecutor
 from contextlib import contextmanager, asynccontextmanager
@@ -20,14 +21,14 @@ executors = {
 
 
 class TaskScheduler:
-    def __init__(self, use_async: bool = False):
+    def __init__(self, url, use_async: bool = False):
         """
         初始化任务调度器
 
         :param use_async: 是否使用异步调度器
         """
         # 配置调度器
-        jobstores = {"default": MemoryJobStore()}
+        jobstores = {"default": SQLAlchemyJobStore(url)}
 
         if use_async:
             # 异步调度器
@@ -260,10 +261,3 @@ class TaskScheduler:
             yield self
         finally:
             self.shutdown()
-
-
-# 创建全局调度器实例
-# 根据应用类型选择：
-# 1. 如果是同步应用（如Flask），使用同步调度器
-# 2. 如果是异步应用（如FastAPI），使用异步调度器
-task_scheduler = TaskScheduler(use_async=True)

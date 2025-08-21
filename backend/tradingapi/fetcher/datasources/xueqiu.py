@@ -26,7 +26,6 @@ class XUEQIU(StockDataSource):
     async def health_check(self) -> bool:
         """检查数据源是否可用"""
         try:
-            ak.daily
             df = await asyncio.wait_for(
                 asyncio.to_thread(
                     ak.stock_individual_spot_xq,
@@ -39,12 +38,13 @@ class XUEQIU(StockDataSource):
             logger.error(f"健康检查失败, exception:{ex}")
             return False
 
-    async def _fetch_stock_detail(self, ex:str, symbol: str):
+    async def _fetch_stock_detail(self, exchange:str, symbol: str):
         def _fetch():
-            stock_info = ak.stock_individual_spot_xq(symbol=ex.upper() + symbol, token=token)
+            stock_info = ak.stock_individual_spot_xq(symbol=exchange.upper() + symbol, token=token)
             info_dict = dict(zip(stock_info["item"], stock_info["value"]))
             return {
                 "证券代码": symbol,
+                "交易所":exchange,
                 "名称": info_dict.get("名称", ""),
                 "总股本": info_dict.get("基金份额/总股本"),
                 "流通股": info_dict.get("流通股"),
@@ -91,6 +91,10 @@ class XUEQIU(StockDataSource):
                 f"存在不符合必填字段规范的行，将被删除:\n{df.loc[mask_invalid]}"
             )
         return df.loc[~mask_invalid].copy()
+
+    @manager.register_method(weight=1.2, max_requests_per_minute=30, max_concurrent=5)
+    async def get_stock_basic_info(self, exchange, symbol):
+        return await self._fetch_stock_detail(exchange=exchange, symbol=symbol) 
 
     @manager.register_method(weight=1.2, max_requests_per_minute=30, max_concurrent=5)
     async def get_all_stock_basic_info(self):

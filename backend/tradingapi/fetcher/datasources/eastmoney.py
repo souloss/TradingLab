@@ -95,23 +95,24 @@ class EASTMONEY(StockDataSource):
             )
         return df.loc[~mask_invalid].copy()
 
-    async def _fetch_stock_detail(self, code: str):
+    async def _fetch_stock_detail(self, exchange:str, symbol: str):
         def _fetch():
-            stock_info = ak.stock_individual_info_em(symbol=code)
+            stock_info = ak.stock_individual_info_em(symbol=symbol)
             info_dict = dict(zip(stock_info["item"], stock_info["value"]))
             return {
-                "证券代码": code,
+                "证券代码": symbol,
+                "交易所": exchange,
                 "名称": info_dict.get("股票简称", ""),
                 "总股本": info_dict.get("总股本"),
                 "流通股": info_dict.get("流通股"),
                 "总市值": info_dict.get("总市值"),
                 "流通市值": info_dict.get("流通市值"),
                 "行业": info_dict.get("行业", ""),
-                "上市时间": info_dict.get("上市时间", ""),
+                "上市时间": str(info_dict.get("上市时间", "")),
             }
 
         try:
-            logger.debug(f"开始获取股票详情... {code}")
+            logger.debug(f"开始获取股票详情... {symbol}")
             result = await asyncio.to_thread(_fetch)
             logger.debug(f"股票详情获取成功... {result}")
             return result
@@ -119,27 +120,9 @@ class EASTMONEY(StockDataSource):
             logger.error(f"获取股票详情失败: {e}")
             return {}
 
-    # async def get_stock_basic_info(self, symbol:str, exchange:str=None):
-    #     basic_base_info =  self._fetch_stock_detail(symbol)
-    #     stocks = self._clean_numeric_columns(stocks)
-    #     stocks = self._format_listing_date(stocks)
-    #     stocks = self._log_and_drop_invalid_rows(stocks, required_cols=["名称", "交易所", "板块"])
-
-    #     # 排序列
-    #     final_columns = [
-    #         "交易所",
-    #         "板块",
-    #         "股票类型",
-    #         "证券代码",
-    #         "名称",
-    #         "上市时间",
-    #         "行业",
-    #         "总股本",
-    #         "流通股",
-    #         "总市值",
-    #         "流通市值",
-    #     ]
-    #     return stocks[final_columns]
+    @manager.register_method(weight=1.2, max_requests_per_minute=30, max_concurrent=5)
+    async def get_stock_basic_info(self, exchange, symbol):
+        return await self._fetch_stock_detail(exchange=exchange, symbol=symbol)
 
     @manager.register_method(weight=1.2, max_requests_per_minute=30, max_concurrent=5)
     async def get_all_stock_basic_info(self):
@@ -163,7 +146,7 @@ class EASTMONEY(StockDataSource):
             stocks[col] = None
 
         # 并发获取股票详情
-        tasks = [self._fetch_stock_detail(code) for code in stocks["证券代码"]]
+        tasks = [self._fetch_stock_detail(stock["交易所"], stock["证券代码"]) for stock in stocks]
         results = await asyncio.gather(*tasks)
 
         # 将结果填充回 DataFrame
