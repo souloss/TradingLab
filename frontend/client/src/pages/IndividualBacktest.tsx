@@ -67,6 +67,7 @@ const strategies: StrategyConfig[] = [
 export default function IndividualBacktest() {
   const [, setLocation] = useLocation();
   const [stockCode, setStockCode] = useState("001335");
+
   // 取今天的日期
   const today = new Date();
   // 取一年前的同一天
@@ -74,31 +75,44 @@ export default function IndividualBacktest() {
   oneYearAgo.setFullYear(today.getFullYear() - 1);
   // 转成 YYYY-MM-DD 的字符串（本地时区）
   const formatDate = (date: Date) => date.toISOString().split('T')[0];
+
   const [startDate, setStartDate] = useState(formatDate(oneYearAgo));
   const [endDate, setEndDate] = useState(formatDate(today));
 
-  const [selectedStrategies, setSelectedStrategies] = useState<Set<string>>(new Set(["volume"]));
+  // 改为单选，存储当前选中的策略ID
+  const [selectedStrategy, setSelectedStrategy] = useState<string | null>("volume");
+
   const [strategyParameters, setStrategyParameters] = useState<Record<string, Record<string, any>>>({
     macd: { fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 },
     ma: { shortPeriod: 5, longPeriod: 20 },
-    atr: { atrPeriod: 14, highLowPeriod: 20, atrMultiplier: 1.5 },
-    volume: { timeRange: 60, buyVolumeMultiplier: 0.4, sellVolumeMultiplier: 3 }
+    atr: { atr_period: 14, period: 20, atr_multiplier: 1.5 },
+    volume: { period: 60, buyVolumeMultiplier: 0.4, sellVolumeMultiplier: 3 }
   });
+
+  // 添加一个状态来标记是否使用自动参数优化
+  const [autoOptimize, setAutoOptimize] = useState(false);
 
   const backtestMutation = useMutation({
     mutationFn: async () => {
-      const selectedStrategyConfigs = Array.from(selectedStrategies).map(strategyId => {
-        const strategy = strategies.find(s => s.id === strategyId)!;
-        return {
-          type: strategy.type,
-          parameters: strategyParameters[strategyId]
-        };
-      });
+      // 如果没有选中策略，则返回错误
+      if (!selectedStrategy) {
+        throw new Error('请选择一个策略');
+      }
+
+      const strategy = strategies.find(s => s.id === selectedStrategy)!;
+
+      // 构建单个策略配置对象
+      const selectedStrategyConfig = {
+        type: strategy.type,
+        parameters: strategyParameters[selectedStrategy],
+        optimize: autoOptimize
+      };
+
       const response = await apiRequest<BacktestResponse>('POST', '/api/v1/backtest/stock', {
         stockCode,
         startDate,
         endDate,
-        strategies: selectedStrategyConfigs
+        strategy: selectedStrategyConfig // 使用单个策略对象而不是数组
       });
       return response;
     },
@@ -107,14 +121,13 @@ export default function IndividualBacktest() {
     }
   });
 
-  const handleStrategyToggle = (strategyId: string) => {
-    const newSelected = new Set(selectedStrategies);
-    if (newSelected.has(strategyId)) {
-      newSelected.delete(strategyId);
-    } else {
-      newSelected.add(strategyId);
+  // 修改策略选择处理函数，改为单选
+  const handleStrategySelect = (strategyId: string) => {
+    setSelectedStrategy(selectedStrategy === strategyId ? null : strategyId);
+    // 当选择新策略时，关闭自动优化
+    if (autoOptimize) {
+      setAutoOptimize(false);
     }
-    setSelectedStrategies(newSelected);
   };
 
   const handleParameterChange = (strategyId: string, paramName: string, value: any) => {
@@ -125,11 +138,24 @@ export default function IndividualBacktest() {
         [paramName]: value
       }
     }));
+    // 当手动修改参数时，关闭自动优化
+    if (autoOptimize) {
+      setAutoOptimize(false);
+    }
+  };
+
+  // 处理自动参数优化
+  const handleAutoOptimize = () => {
+    if (!selectedStrategy) {
+      alert('请先选择一个策略');
+      return;
+    }
+    setAutoOptimize(true);
   };
 
   const handleBacktest = () => {
-    if (selectedStrategies.size === 0) {
-      alert('请至少选择一个策略');
+    if (!selectedStrategy) {
+      alert('请选择一个策略');
       return;
     }
     backtestMutation.mutate();
@@ -138,7 +164,7 @@ export default function IndividualBacktest() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <LoadingOverlay isVisible={backtestMutation.isPending} />
-      
+
       <div className="mb-8">
         <div className="flex items-center space-x-3 mb-4">
           <div className="bg-success text-success-foreground rounded-lg p-2">
@@ -209,14 +235,42 @@ export default function IndividualBacktest() {
               <div key={strategy.id} className="space-y-4">
                 <StrategyCard
                   strategy={strategy}
-                  isSelected={selectedStrategies.has(strategy.id)}
+                  isSelected={selectedStrategy === strategy.id}
                   parameters={strategyParameters[strategy.id]}
-                  onToggle={handleStrategyToggle}
+                  onToggle={handleStrategySelect} // 改为单选处理函数
                   onParameterChange={handleParameterChange}
+                  isSingleSelect={true} // 添加一个属性表明现在是单选模式
                 />
               </div>
             ))}
           </div>
+
+          {/* 自动参数优化按钮 */}
+          <div className="mt-6 flex justify-center">
+            <Button
+              variant={autoOptimize ? "default" : "outline"}
+              className={`${autoOptimize ? "bg-indigo-600 hover:bg-indigo-700" : "border-indigo-600 text-indigo-600 hover:bg-indigo-50"}`}
+              onClick={handleAutoOptimize}
+              disabled={!selectedStrategy}
+            >
+              <i className={`fas ${autoOptimize ? "fa-check-circle" : "fa-magic"} mr-2`}></i>
+              {autoOptimize ? "已启用自动参数优化" : "自动策略参数调优"}
+            </Button>
+          </div>
+
+          {autoOptimize && (
+            <div className="mt-4 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+              <div className="flex items-start">
+                <i className="fas fa-info-circle text-indigo-600 mt-1 mr-2"></i>
+                <div>
+                  <p className="text-sm font-medium text-indigo-800">自动参数优化已启用</p>
+                  <p className="text-sm text-indigo-600 mt-1">
+                    系统将自动为选定的策略寻找最优参数组合，无需手动调整。回测时间可能会稍长，但结果更加客观准确。
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -225,10 +279,10 @@ export default function IndividualBacktest() {
         <Button variant="outline" onClick={() => setLocation('/')}>
           返回首页
         </Button>
-        <Button 
-          onClick={handleBacktest} 
+        <Button
+          onClick={handleBacktest}
           className="bg-success text-success-foreground hover:bg-success/90"
-          disabled={backtestMutation.isPending || selectedStrategies.size === 0}
+          disabled={backtestMutation.isPending || !selectedStrategy}
         >
           <i className="fas fa-play mr-2"></i>
           开始回测

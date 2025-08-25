@@ -1,19 +1,37 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { StockData } from "../types";
+import type { StockData, BacktestStats, TradeRecord, EquityPoint } from "../types";;
 
 interface StockChartProps {
   data: StockData[];
-  trades: Array<{
-    date: string;
-    type: "BUY" | "SELL" | "HOLD";
-    price: number;
-    quantity: number;
-  }>;
+  backtestStats: BacktestStats; // 使用回测结果替代原来的 trades
   selectedPeriod: string; // "1d" | "1w" | "1m" | "3m" | "6m" | "1y"
   onPeriodChange: (period: string) => void;
 }
 
+const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone; 
+console.log("用户时区为:" + userTimezone)
 // ---- 工具函数 ----
+/**
+ * 将北京时间（Asia/Shanghai）转换为 UTC 毫秒时间戳
+ * @param beijingTime - 北京时间字符串，如 "2024-08-23" 或 "2024-08-23 00:00:00"
+ * @returns UTC 毫秒时间戳
+ */
+function beijingDateToUtc(dateStr: string): number {
+  // 强制补上 00:00:00
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    dateStr += "T00:00:00";
+  }
+  // 用 Date.UTC 构造 UTC 时间戳，再减去 8 小时（得到北京时间）
+  const d = new Date(dateStr);
+  return Date.UTC(
+    d.getFullYear(),
+    d.getMonth(),
+    d.getDate(),
+    d.getHours()-8,
+    d.getMinutes(),
+    d.getSeconds()
+  );
+}
 type Tick = { date: string | Date; close: number };
 const calculateMA = (data: Tick[], period: number): Array<[number, number]> => {
   if (period <= 0 || data.length < period) return [];
@@ -84,7 +102,7 @@ const getRangeMs = (period: string): number => {
 
 export default function StockChart({
   data,
-  trades,
+  backtestStats,
   selectedPeriod,
   onPeriodChange,
 }: StockChartProps) {
@@ -128,7 +146,7 @@ export default function StockChart({
   const priceDataAll = useMemo(
     () =>
       sortedData.map((item) => [
-        new Date(item.date).getTime(),
+        beijingDateToUtc(item.date),
         item.open,
         item.high,
         item.low,
@@ -140,7 +158,7 @@ export default function StockChart({
   const volumeDataAll = useMemo(
     () =>
       sortedData.map((item) => [
-        new Date(item.date).getTime(),
+        beijingDateToUtc(item.date),
         item.volume,
       ]) as Array<[number, number]>,
     [sortedData]
@@ -220,7 +238,7 @@ export default function StockChart({
         const seriesData = sortedData
           .filter(item => item.extra_fields?.[name] != null)
           .map(item => [
-            new Date(item.date).getTime(),
+            beijingDateToUtc(item.date),
             Number(item.extra_fields?.[name])
           ]) as Array<[number, number]>; 
 
@@ -236,8 +254,6 @@ export default function StockChart({
       })
       .filter(Boolean) as Highcharts.SeriesOptionsType[];
   }, [sortedData, cutoff]);
-
-
   const priceData = useMemo(() => filterByCutoff(priceDataAll), [priceDataAll, cutoff]);
   const volumeData = useMemo(() => filterByCutoff(volumeDataAll), [volumeDataAll, cutoff]);
   const ma5Data = useMemo(() => filterByCutoff(ma5All), [ma5All, cutoff]);
@@ -247,12 +263,12 @@ export default function StockChart({
   const atrData = useMemo(() => filterByCutoff(atrAll), [atrAll, cutoff]);
 
   // 交易信号（仅 BUY/SELL，且按窗口裁剪）
-  const buyPoints = useMemo(() => {
-    const pts = trades
-      .filter((t) => t.type === "BUY")
-      .map((t) => ({
-        x: new Date(t.date).getTime(),
-        y: t.price,
+  const tradePoints = useMemo(() => {
+    if (!backtestStats || !backtestStats.trades) return { buyPoints: [], sellPoints: [], positionLines: [] };
+
+    const buyPoints = backtestStats.trades.map((trade: TradeRecord) => ({
+        x: beijingDateToUtc(trade.entry_time),
+        y: trade.entry_price,
         marker: {
           symbol: "circle",
           fillColor: "#22c55e",
@@ -265,16 +281,18 @@ export default function StockChart({
           format: "B",
           style: { color: "#22c55e", fontWeight: "bold" },
         },
+        // 添加自定义属性用于 tooltip
+        trade: {
+          type: "买入",
+          price: trade.entry_price,
+          size: trade.size,
+        }
       }));
-    return isNaN(cutoff) ? pts : pts.filter((p) => p.x >= cutoff);
-  }, [trades, cutoff]);
 
-  const sellPoints = useMemo(() => {
-    const pts = trades
-      .filter((t) => t.type === "SELL")
-      .map((t) => ({
-        x: new Date(t.date).getTime(),
-        y: t.price,
+    const sellPoints = backtestStats.trades
+      .map((trade: TradeRecord) => ({
+        x: beijingDateToUtc(trade.exit_time),
+        y: trade.exit_price,
         marker: {
           symbol: "circle",
           fillColor: "#ef4444",
@@ -287,9 +305,57 @@ export default function StockChart({
           format: "S",
           style: { color: "#ef4444", fontWeight: "bold" },
         },
+        // 添加自定义属性用于 tooltip
+        trade: {
+          type: "卖出",
+          price: trade.exit_price,
+          size: trade.size,
+        }
       }));
-    return isNaN(cutoff) ? pts : pts.filter((p) => p.x >= cutoff);
-  }, [trades, cutoff]);
+
+    // 创建持仓线
+    const positionLines = backtestStats.trades.map((trade: TradeRecord) => ({
+      type: "line" as const,
+      name: `持仓 ${trade.tag || ''}`,
+      data: [
+        [beijingDateToUtc(trade.entry_time), trade.entry_price],
+        [beijingDateToUtc(trade.exit_time), trade.exit_price]
+      ],
+      color: trade.pnl > 0 ? "#22c55e" : "#ef4444",
+      lineWidth: 1,
+      dashStyle: "Dash" as Highcharts.DashStyleValue,
+      yAxis: 0,
+      showInLegend: false,
+      // 添加自定义属性用于 tooltip
+      trade: {
+        type: "持仓",
+        entry_price: trade.entry_price,
+        exit_price: trade.exit_price,
+        size: trade.size,
+        pnl: trade.pnl,
+        return_pct: trade.return_pct,
+        duration: trade.duration,
+        tag: trade.tag,
+        sl: trade.sl,
+        tp: trade.tp
+      }
+    }));
+
+    // 根据 selectedPeriod 裁剪数据
+    const filteredBuyPoints = isNaN(cutoff) ? buyPoints : buyPoints.filter((p) => p.x >= cutoff);
+    const filteredSellPoints = isNaN(cutoff) ? sellPoints : sellPoints.filter((p) => p.x >= cutoff);
+    const filteredPositionLines = isNaN(cutoff)
+      ? positionLines
+      : positionLines.filter(line =>
+        line.data[0][0] >= cutoff || line.data[1][0] >= cutoff
+      );
+
+    return {
+      buyPoints: filteredBuyPoints,
+      sellPoints: filteredSellPoints,
+      positionLines: filteredPositionLines
+    };
+  }, [backtestStats, cutoff]);
 
   const initModule = (mod: any, Highcharts: any) => {
     if (typeof mod === "function") {
@@ -302,28 +368,40 @@ export default function StockChart({
   // ---- 只加载一次 Highcharts（SSR 安全，且避免 default 导出差异）----
   useEffect(() => {
     let mounted = true;
+
     const loadHighcharts = async () => {
       try {
+        // 1️⃣ 导入 Highstock 核心
         const mod = await import("highcharts/highstock");
         if (!mounted) return;
         const Highcharts = (mod as any).default || mod;
 
-        // 加载模块
-        const modules = await Promise.all([
-          import("highcharts/modules/full-screen"),
+        // 2️⃣ 核心模块（必须先加载）
+        const coreModules = await Promise.all([
           import("highcharts/modules/exporting"),
           import("highcharts/modules/export-data"),
           import("highcharts/modules/data"),
+        ]);
+        coreModules.forEach((m: any) => {
+          // m 可能是函数模块或 { default: 函数 } 形式
+          const fn = typeof m === "function" ? m : m?.default;
+          if (typeof fn === "function") fn(Highcharts);
+        });
+
+        // 3️⃣ 扩展模块
+        const extraModules = await Promise.all([
+          import("highcharts/modules/full-screen"),
           import("highcharts/modules/drag-panes"),
           import("highcharts/modules/annotations"),
           import("highcharts/modules/price-indicator"),
           import("highcharts/modules/stock-tools"),
           import("highcharts/indicators/indicators-all"),
         ]);
-
-        // 注册模块到 Highcharts
-        modules.forEach((m) => initModule(m, Highcharts));
-
+        extraModules.forEach((m: any) => {
+          const fn = typeof m === "function" ? m : m?.default;
+          if (typeof fn === "function") fn(Highcharts);
+        });
+        // 4️⃣ 保存实例
         highchartsRef.current = Highcharts;
         setHighchartsLoaded(true);
         setError(null);
@@ -334,9 +412,9 @@ export default function StockChart({
         setHighchartsLoaded(false);
       }
     };
-    if (!highchartsRef.current && !highchartsLoaded) {
-      loadHighcharts();
-    }
+
+    if (!highchartsRef.current && !highchartsLoaded) loadHighcharts();
+
     return () => {
       mounted = false;
     };
@@ -364,6 +442,9 @@ export default function StockChart({
 
     try {
       const chartOptions: Highcharts.Options = {
+        time: {
+          timezone: userTimezone, // 直接指定时区
+        },
         accessibility: {
           enabled: false,
         },
@@ -384,11 +465,44 @@ export default function StockChart({
         tooltip: {
           shared: true,
           formatter: function () {
-            const point = this.points?.[0]?.point;
-            const extra = sortedData.find(
-              d => new Date(d.date.split('T')[0]).getTime() === point?.x
-            )?.extra_fields;
-            let html = `<b>${Highcharts.dateFormat("%Y-%m-%d", point?.x)}</b><br/>`;
+            const xValue = this.x; // 横坐标，已经是 number 类型
+
+            const extra = sortedData.find(d => {
+              const [year, month, day] = d.date.split("T")[0].split("-").map(Number);
+              return Date.UTC(year, month - 1, day) === xValue; // 和 this.x 对齐
+            })?.extra_fields;
+
+            const SH_TZ_MINUTES = 8 * 60; // 上海 UTC+8
+            const shanghaiTs = xValue + SH_TZ_MINUTES * 60 * 1000;
+            let html = `<b>${Highcharts.dateFormat("%Y-%m-%d", shanghaiTs, true)}</b><br/>`;
+
+            // 处理交易点信息
+            const tradePoint = this.points?.find(p => {
+              // 直接检查 Point 对象是否有自定义的 trade 属性
+              return (p as any).trade ||
+                // 或者检查是否是交易系列的点
+                p.series.name === "买入信号" ||
+                p.series.name === "卖出信号" ||
+                p.series.name?.startsWith("持仓");
+            });
+
+            if (tradePoint) {
+              // 直接从 Point 对象获取 trade 属性
+              const trade = (tradePoint as any).trade;
+
+              if (trade) {
+                html += `<br/><b>交易信息:</b><br/>`;
+                html += `类型: ${trade.type}<br/>`;
+                html += `价格: ${trade.price}<br/>`;
+                html += `数量: ${trade.size}<br/>`;
+                html += `盈亏: ${trade.pnl}<br/>`;
+                html += `收益率: ${trade.return_pct}%<br/>`;
+                html += `持仓时间: ${trade.duration}<br/>`;
+                if (trade.tag) html += `标签: ${trade.tag}<br/>`;
+                if (trade.sl) html += `止损价: ${trade.sl}<br/>`;
+                if (trade.tp) html += `止盈价: ${trade.tp}<br/>`;
+              }
+            }
 
             this.points?.forEach(p => {
               html += `<span style="color:${p.color}">\u25CF</span> ${p.series.name}: <b>${p.y}</b><br/>`;
@@ -407,6 +521,7 @@ export default function StockChart({
                 }
               });
             }
+
             return html;
           },
         },
@@ -487,7 +602,7 @@ export default function StockChart({
             name: "止损线",
             data: stopLossLine,
             color: "#3b82f6", // 蓝色
-            dashStyle: "Dash",
+            dashStyle: "Dash" as Highcharts.DashStyleValue,
             lineWidth: 1.5,
             yAxis: 0,
           },
@@ -496,34 +611,38 @@ export default function StockChart({
             name: "止盈线",
             data: stopWinLine,
             color: "#ef4444", // 红色
-            dashStyle: "Dash",
+            dashStyle: "Dash" as Highcharts.DashStyleValue,
             lineWidth: 1.5,
             yAxis: 0,
           },
           ...indicatorSeries,
+          // 添加持仓线
+          ...tradePoints.positionLines,
         ],
       };
 
       chartInstance.current = Highcharts.stockChart(chartRef.current, chartOptions);
-
-      // 交易信号
-      if (buyPoints.length) {
+      
+      // 添加买入卖出点
+      if (tradePoints.buyPoints.length) {
         chartInstance.current.addSeries({
           type: "scatter",
           name: "买入信号",
-          data: buyPoints,
+          data: tradePoints.buyPoints,
           yAxis: 0,
           showInLegend: false,
         });
       }
-      if (sellPoints.length) {
+
+      if (tradePoints.sellPoints.length) {
         chartInstance.current.addSeries({
           type: "scatter",
           name: "卖出信号",
-          data: sellPoints,
+          data: tradePoints.sellPoints,
           yAxis: 0,
           showInLegend: false,
         });
+
       }
     } catch (err) {
       console.error("Failed to create chart:", err);
@@ -545,8 +664,10 @@ export default function StockChart({
     ma5Data,
     ma10Data,
     ma20Data,
-    buyPoints,
-    sellPoints,
+    tradePoints,
+    indicatorSeries,
+    stopLossLine,
+    stopWinLine,
   ]);
 
   return (

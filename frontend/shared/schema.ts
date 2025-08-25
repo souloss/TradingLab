@@ -53,13 +53,13 @@ export const maParametersSchema = z.object({
 });
 
 export const atrParametersSchema = z.object({
-  atrPeriod: z.number().min(1).max(100).default(14),
-  highLowPeriod: z.number().min(1).max(100).default(20),
-  atrMultiplier: z.number().min(0.1).max(10).default(1.5),
+  atr_period: z.number().min(1).max(100).default(14),
+  period: z.number().min(1).max(100).default(20),
+  atr_multiplier: z.number().min(0.1).max(10).default(1.5),
 });
 
 export const volumeParametersSchema = z.object({
-  timeRange: z.number().min(1).max(100).default(20),
+  period: z.number().min(1).max(100).default(20),
   buyVolumeMultiplier: z.number().min(0.1).max(5).default(0.3),
   sellVolumeMultiplier: z.number().min(1).max(10).default(3),
 });

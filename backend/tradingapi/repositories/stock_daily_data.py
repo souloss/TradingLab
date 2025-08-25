@@ -49,7 +49,6 @@ def dataframe_to_daily_data(df: pd.DataFrame) -> List[StockDailyData]:
     """
     # 确保 DataFrame 包含所有必要的列
     required_columns = [
-        OHLCVExtendedSchema.timestamp,
         OHLCVExtendedSchema.symbol,
         OHLCVExtendedSchema.open,
         OHLCVExtendedSchema.close,

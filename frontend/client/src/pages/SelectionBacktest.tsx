@@ -73,9 +73,9 @@ export default function SelectionBacktest() {
   const [location, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
   const [filterCriteria, setFilterCriteria] = useState({
-    exchange: 'All', 
+    exchange: 'All',
     sections: 'All',
-    industries: 'All', 
+    industries: 'All',
     stockType: 'All',
     board: 'All',
     minMarketCap: 0,
@@ -84,13 +84,20 @@ export default function SelectionBacktest() {
     endListingDate: '2024-12-31'
   });
   const [filteredStocks, setFilteredStocks] = useState<Stock[]>([]);
-  const [selectedStrategies, setSelectedStrategies] = useState<Set<string>>(new Set(['macd']));
+
+  // 改为单选，存储当前选中的策略ID
+  const [selectedStrategy, setSelectedStrategy] = useState<string | null>("macd");
+
   const [strategyParameters, setStrategyParameters] = useState<Record<string, Record<string, any>>>({
     macd: { fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 },
     ma: { shortPeriod: 5, longPeriod: 20 },
-    atr: { atrPeriod: 14, highLowPeriod: 20, atrMultiplier: 1.5 },
-    volume: { timeRange: 20, buyVolumeMultiplier: 0.3, sellVolumeMultiplier: 3 }
+    atr: { atr_period: 14, period: 20, atr_multiplier: 1.5 },
+    volume: { period: 20, buyVolumeMultiplier: 0.3, sellVolumeMultiplier: 3 }
   });
+
+  // 添加一个状态来标记是否使用自动参数优化
+  const [autoOptimize, setAutoOptimize] = useState(false);
+
   const [backtestResults, setBacktestResults] = useState<BacktestResults>([]);
   const [stockFilterOptions, setStockFilterOptions] = useState<StockFilterOptions>({
     exchanges: [],
@@ -149,6 +156,7 @@ export default function SelectionBacktest() {
     min_market_cap?: number;
     max_market_cap?: number;
   }
+
   // 转换函数：将前端状态转换为后端格式
   const convertToBackendFilter = (criteria: typeof filterCriteria): StockBasicInfoFilter => {
     const isAll = (value: string) => value === 'All' || value === '';
@@ -220,7 +228,6 @@ export default function SelectionBacktest() {
   ];
 
   type BacktestRow = BacktestResults[number];
-
   const backtestColumns: Column<BacktestRow>[] = [
     {
       id: "stockCode",
@@ -316,7 +323,7 @@ export default function SelectionBacktest() {
       width: "120px",
     },
   ];
-  
+
   const [dateRange, setDateRange] = useState({
     startDate: addYears(new Date(), -1),
     endDate: new Date(),
@@ -330,6 +337,7 @@ export default function SelectionBacktest() {
       return response;
     }
   });
+
   // 3. 数据获取成功时更新状态
   useEffect(() => {
     if (filterOptionsQuery.isSuccess && filterOptionsQuery.data) {
@@ -350,21 +358,26 @@ export default function SelectionBacktest() {
 
   const selectionBacktestMutation = useMutation({
     mutationFn: async () => {
-      // 准备策略配置
-      const selectedStrategyConfigs = Array.from(selectedStrategies).map(strategyId => {
-        const strategy = strategies.find(s => s.id === strategyId)!;
-        return {
-          type: strategy.type,
-          parameters: strategyParameters[strategyId]
-        };
-      });
+      // 如果没有选中策略，则返回错误
+      if (!selectedStrategy) {
+        throw new Error('请选择一个策略');
+      }
+
+      const strategy = strategies.find(s => s.id === selectedStrategy)!;
+
+      // 构建单个策略配置对象
+      const selectedStrategyConfig = {
+        type: strategy.type,
+        parameters: autoOptimize ? {} : strategyParameters[selectedStrategy],
+        optimize: autoOptimize
+      };
 
       // 为每只股票创建回测请求
       const backtestRequests = filteredStocks.map(stock => ({
         stockCode: stock.symbol, // 使用股票代码
         startDate: dayjs(dateRange.startDate).format("YYYY-MM-DD"),
         endDate: dayjs(dateRange.endDate).format("YYYY-MM-DD"),
-        strategies: selectedStrategyConfigs
+        strategy: selectedStrategyConfig // 使用单个策略对象而不是数组
       }));
 
       // 发送批量回测请求
@@ -373,7 +386,6 @@ export default function SelectionBacktest() {
         '/api/v1/backtest/stocks',
         backtestRequests
       );
-
       return response;
     },
     onSuccess: (data) => {
@@ -390,14 +402,13 @@ export default function SelectionBacktest() {
     filterStocksMutation.mutate();
   };
 
-  const handleStrategyToggle = (strategyId: string) => {
-    const newSelected = new Set(selectedStrategies);
-    if (newSelected.has(strategyId)) {
-      newSelected.delete(strategyId);
-    } else {
-      newSelected.add(strategyId);
+  // 修改策略选择处理函数，改为单选
+  const handleStrategySelect = (strategyId: string) => {
+    setSelectedStrategy(selectedStrategy === strategyId ? null : strategyId);
+    // 当选择新策略时，关闭自动优化
+    if (autoOptimize) {
+      setAutoOptimize(false);
     }
-    setSelectedStrategies(newSelected);
   };
 
   const handleParameterChange = (strategyId: string, paramName: string, value: any) => {
@@ -408,11 +419,24 @@ export default function SelectionBacktest() {
         [paramName]: value
       }
     }));
+    // 当手动修改参数时，关闭自动优化
+    if (autoOptimize) {
+      setAutoOptimize(false);
+    }
+  };
+
+  // 处理自动参数优化
+  const handleAutoOptimize = () => {
+    if (!selectedStrategy) {
+      alert('请先选择一个策略');
+      return;
+    }
+    setAutoOptimize(true);
   };
 
   const handleStartBacktest = () => {
-    if (selectedStrategies.size === 0) {
-      alert('请至少选择一个策略');
+    if (!selectedStrategy) {
+      alert('请选择一个策略');
       return;
     }
     selectionBacktestMutation.mutate();
@@ -438,7 +462,7 @@ export default function SelectionBacktest() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <LoadingOverlay isVisible={filterStocksMutation.isPending || selectionBacktestMutation.isPending} />
-      
+
       <div className="mb-8">
         <div className="flex items-center space-x-3 mb-4">
           <div className="bg-secondary text-secondary-foreground rounded-lg p-2">
@@ -454,15 +478,14 @@ export default function SelectionBacktest() {
         <div className="flex items-center">
           {stepNavigation.map((step, index) => (
             <div key={step.id} className="flex items-center">
-              <div className={`step-nav px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                step.active 
-                  ? step.id === 3 
+              <div className={`step-nav px-4 py-2 rounded-lg text-sm font-medium transition-colors ${step.active
+                  ? step.id === 3
                     ? "active bg-secondary text-secondary-foreground"
                     : "active bg-success text-success-foreground"
-                  : step.id < currentStep 
+                  : step.id < currentStep
                     ? "bg-green-100 text-green-700"
                     : "bg-muted text-muted-foreground"
-              }`}>
+                }`}>
                 <i className={`${step.icon} mr-2`}></i>
                 {step.label}
               </div>
@@ -536,20 +559,8 @@ export default function SelectionBacktest() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {/* <Select value={filterCriteria.board} onValueChange={(value) => setFilterCriteria(prev => ({ ...prev, board: value }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="所有板块" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="All">所有板块</SelectItem>
-                      <SelectItem value="主板">主板</SelectItem>
-                      <SelectItem value="中小板">中小板</SelectItem>
-                      <SelectItem value="创业板">创业板</SelectItem>
-                    </SelectContent>
-                  </Select> */}
                 </div>
               </div>
-
               <div className="mb-6">
                 <Label className="text-sm font-medium">市值范围 (亿元): {filterCriteria.minMarketCap} - {filterCriteria.maxMarketCap}</Label>
                 <div className="mt-2">
@@ -563,7 +574,6 @@ export default function SelectionBacktest() {
                   />
                 </div>
               </div>
-
               <div className="grid md:grid-cols-2 gap-6 mb-6">
                 <div>
                   <Label htmlFor="startListingDate">上市起始日期</Label>
@@ -586,9 +596,8 @@ export default function SelectionBacktest() {
                   />
                 </div>
               </div>
-
-              <Button 
-                onClick={handleInitialFilter} 
+              <Button
+                onClick={handleInitialFilter}
                 className="bg-secondary text-secondary-foreground hover:bg-secondary/90"
                 disabled={filterStocksMutation.isPending}
               >
@@ -644,11 +653,13 @@ export default function SelectionBacktest() {
               <p className="text-green-700">基于筛选条件，共筛选出 {filteredStocks.length} 只股票，现在请设置技术分析配置对以上股票进行回测。</p>
             </CardContent>
           </Card>
+
           <BacktestDateRangeCard
             startDate={dateRange.startDate}
             endDate={dateRange.endDate}
             onChange={setDateRange}
           />
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -663,13 +674,41 @@ export default function SelectionBacktest() {
                   <StrategyCard
                     key={strategy.id}
                     strategy={strategy}
-                    isSelected={selectedStrategies.has(strategy.id)}
+                    isSelected={selectedStrategy === strategy.id}
                     parameters={strategyParameters[strategy.id]}
-                    onToggle={handleStrategyToggle}
+                    onToggle={handleStrategySelect} // 改为单选处理函数
                     onParameterChange={handleParameterChange}
+                    isSingleSelect={true} // 添加单选模式标志
                   />
                 ))}
               </div>
+
+              {/* 自动参数优化按钮 */}
+              <div className="mt-6 flex justify-center">
+                <Button
+                  variant={autoOptimize ? "default" : "outline"}
+                  className={`${autoOptimize ? "bg-indigo-600 hover:bg-indigo-700" : "border-indigo-600 text-indigo-600 hover:bg-indigo-50"}`}
+                  onClick={handleAutoOptimize}
+                  disabled={!selectedStrategy}
+                >
+                  <i className={`fas ${autoOptimize ? "fa-check-circle" : "fa-magic"} mr-2`}></i>
+                  {autoOptimize ? "已启用自动参数优化" : "自动策略参数调优"}
+                </Button>
+              </div>
+
+              {autoOptimize && (
+                <div className="mt-4 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                  <div className="flex items-start">
+                    <i className="fas fa-info-circle text-indigo-600 mt-1 mr-2"></i>
+                    <div>
+                      <p className="text-sm font-medium text-indigo-800">自动参数优化已启用</p>
+                      <p className="text-sm text-indigo-600 mt-1">
+                        系统将自动为选定的策略寻找最优参数组合，无需手动调整。回测时间可能会稍长，但结果更加客观准确。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -677,10 +716,10 @@ export default function SelectionBacktest() {
             <Button variant="outline" onClick={() => setCurrentStep(1)}>
               返回选股
             </Button>
-            <Button 
-              onClick={handleStartBacktest} 
+            <Button
+              onClick={handleStartBacktest}
               className="bg-secondary text-secondary-foreground hover:bg-secondary/90"
-              disabled={selectionBacktestMutation.isPending || selectedStrategies.size === 0}
+              disabled={selectionBacktestMutation.isPending || !selectedStrategy}
             >
               <i className="fas fa-play mr-2"></i>
               开始选股回测

@@ -1,6 +1,4 @@
 # models/__init__.py
-from .backtest_result import (BacktestResult, BacktestResultCreate,
-                              BacktestResultUpdate)
 from .stock_basic_info import (StockBasicInfo, StockBasicInfoCreate,
                                StockBasicInfoUpdate)
 from .stock_daily_data import (StockDailyData, StockDailyDataCreate,
@@ -8,6 +6,7 @@ from .stock_daily_data import (StockDailyData, StockDailyDataCreate,
 from .stock_industry import (StockIndustry, StockIndustryCreate,
                              StockIndustryMapping, StockIndustryMappingCreate,
                              StockIndustryMappingUpdate, StockIndustryUpdate)
+from .backtest_stats import BacktestStatsTable
 
 __all__ = [
     "StockBasicInfo",
@@ -25,4 +24,5 @@ __all__ = [
     "StockIndustryMapping",
     "StockIndustryMappingCreate",
     "StockIndustryMappingUpdate",
+    "BacktestStatsTable",
 ]

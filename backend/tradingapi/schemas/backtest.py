@@ -6,32 +6,18 @@ from uuid import UUID
 
 from pydantic import (BaseModel, ConfigDict, Field, field_serializer, field_validator,
                       model_validator)
-from pydantic.alias_generators import to_camel  # 官方驼峰生成器
+from pydantic.alias_generators import to_camel
+
+from tradingapi.strategyv2.model import BacktestStats  # 官方驼峰生成器
 
 from .stocks import StockBasicInfoFilter, StockCodeType
-from .strategy import StrategyItem
+from .strategy import Strategy
 
 
 class TradeType(str, Enum):
     BUY = "BUY"
     SELL = "SELL"
     HOLD = "HOLD"
-
-
-# 交易记录响应模型
-class Trade(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)  # 允许使用原始名称或别名
-
-    trade_date: datetime = Field(..., alias="date", description="交易日期")
-    type: TradeType = Field(
-        ..., description="交易类型", json_schema_extra={"examples": ["BUY"]}
-    )
-    price: float = Field(..., description="交易价格")
-    quantity: int = Field(..., description="交易数量")
-    commission: float = Field(..., description="交易佣金")
-    marketValue: float = Field(..., description="交易后市值")
-    cashBalance: float = Field(..., description="交易后现金余额")
-
 
 # 图表数据响应模型
 class ChartData(BaseModel):
@@ -52,16 +38,18 @@ class ChartData(BaseModel):
 
 # 单股回测响应模型
 class BacktestResponse(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
+    model_config = ConfigDict(
+        populate_by_name=True,
+        from_attributes=True,
+        alias_generator=to_camel,
+    )
 
     id: str = Field(..., description="回测 ID")
     stock_code: str = Field(..., alias="stockCode", description="股票代码")
     stock_name: str = Field(..., alias="stockName", description="股票名称")
-    stock_return: float = Field(..., alias="return", description="收益率")
-    trade_count: int = Field(..., alias="tradeCount", description="交易次数")
-    trades: List[Trade] = Field(..., description="交易记录")
+
     chart_data: List[ChartData] = Field(..., alias="chartData", description="图表数据")
-    strategies: List[StrategyItem] = Field(..., description="策略配置列表")
+    backtest_stats: BacktestStats = Field(..., alias="backtestStats", description="回测统计")
 
 # 单股回测请求模型
 class BacktestRequest(BaseModel):
@@ -76,8 +64,8 @@ class BacktestRequest(BaseModel):
     end_date: date = Field(
         ..., description="回测结束日期（YYYY-MM-DD）", examples=["2025-08-10"]
     )
-    strategies: List[StrategyItem] = Field(
-        ..., min_length=1, description="策略配置列表"
+    strategy: Strategy = Field(
+        ..., description="策略配置"
     )
 
     @model_validator(mode="after")
@@ -116,8 +104,8 @@ class SelectStockBacktestReq(BaseModel):
         None,
         description="股票高级过滤器",
     )
-    strategies: List[StrategyItem] = Field(
-        ..., min_length=1, description="策略配置列表"
+    strategies: List[Strategy] = Field(
+        ..., description="策略配置列表"
     )
 
 

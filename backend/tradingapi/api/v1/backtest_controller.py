@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tradingapi.core.db import get_session
 from tradingapi.schemas.backtest import *
 from tradingapi.schemas.response import APIResponse
-from tradingapi.services.backtest_service import BacktestService
+from tradingapi.services.backtest_stats_service import BacktestService
 
 router = APIRouter(prefix="/backtest", tags=["backtest"])
 

@@ -1,3 +1,5 @@
+import json
+import math
 import sys
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -6,7 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -23,6 +25,30 @@ from tradingapi.core.exceptions import (BusinessException,
 from tradingapi.core.initializer import lifespan
 from tradingapi.core.metrics import metrics_collector, metrics_middleware
 from tradingapi.fetcher.manager import manager
+from fastapi.responses import ORJSONResponse
+
+class SafeJSONResponse(JSONResponse):
+    def render(self, content) -> bytes:
+        # 递归处理内容中的 NaN 值
+        def replace_nan(obj):
+            if isinstance(obj, dict):
+                return {k: replace_nan(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [replace_nan(item) for item in obj]
+            elif isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+                return None  # 替换 NaN 为 None
+            return obj
+
+        # 替换 NaN 值
+        processed_content = replace_nan(content)
+
+        return json.dumps(
+            processed_content,
+            ensure_ascii=False,
+            allow_nan=False,  # 禁止 NaN 值
+            indent=None,
+            separators=(",", ":"),
+        ).encode("utf-8")
 
 
 def get_static_dir() -> Path:
@@ -64,6 +90,7 @@ def create_app() -> FastAPI:
         openapi_url=f"/v1/openapi.json" if app_config.DEBUG else None,
         docs_url="/docs" if app_config.DEBUG else None,
         redoc_url="/redoc" if app_config.DEBUG else None,
+        default_response_class=ORJSONResponse,
     )
     # CORS 配置
     app.add_middleware(
@@ -112,7 +139,7 @@ def create_app() -> FastAPI:
         logger.info(f"Static files mounted from: {static_dir}")
     else:
         logger.warning(f"Static files directory not found: {static_dir}")
-    
+
     @app.exception_handler(404)
     async def not_found(request: Request, exc):
         return FileResponse(static_dir / "index.html")

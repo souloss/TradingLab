@@ -58,7 +58,7 @@ class MACrossStrategy(TrendStrategy[MACrossStrategyConfig]):
         )
 
         # 设置信号
-        signals.loc[golden_cross] = SignalType.BUY.value
+        signals.loc[golden_cross] = SignalType.BUY.value 
         signals.loc[death_cross] = SignalType.SELL.value
 
         return SignalResult(

@@ -18,6 +18,7 @@ interface StrategyCardProps {
   parameters: Record<string, any>;
   onToggle: (strategyId: string) => void;
   onParameterChange: (strategyId: string, paramName: string, value: any) => void;
+  isSingleSelect?: boolean; // 添加 isSingleSelect 属性，设为可选
 }
 
 export default function StrategyCard({
@@ -25,7 +26,8 @@ export default function StrategyCard({
   isSelected,
   parameters,
   onToggle,
-  onParameterChange
+  onParameterChange,
+  isSingleSelect = false // 默认为 false，保持向后兼容
 }: StrategyCardProps) {
   const renderParameters = () => {
     switch (strategy.type) {
@@ -70,7 +72,6 @@ export default function StrategyCard({
             </div>
           </div>
         );
-
       case 'MA':
         return (
           <div className="grid md:grid-cols-2 gap-4">
@@ -100,7 +101,6 @@ export default function StrategyCard({
             </div>
           </div>
         );
-
       case 'ATR':
         return (
           <div className="grid md:grid-cols-3 gap-4">
@@ -111,8 +111,8 @@ export default function StrategyCard({
               <Input
                 id={`${strategy.id}-atr`}
                 type="number"
-                value={parameters.atrPeriod || 14}
-                onChange={(e) => onParameterChange(strategy.id, 'atrPeriod', Number(e.target.value))}
+                value={parameters.atr_period || 14}
+                onChange={(e) => onParameterChange(strategy.id, 'atr_period', Number(e.target.value))}
                 className="mt-1"
               />
             </div>
@@ -123,8 +123,8 @@ export default function StrategyCard({
               <Input
                 id={`${strategy.id}-highlow`}
                 type="number"
-                value={parameters.highLowPeriod || 20}
-                onChange={(e) => onParameterChange(strategy.id, 'highLowPeriod', Number(e.target.value))}
+                value={parameters.period || 20}
+                onChange={(e) => onParameterChange(strategy.id, 'period', Number(e.target.value))}
                 className="mt-1"
               />
             </div>
@@ -136,14 +136,13 @@ export default function StrategyCard({
                 id={`${strategy.id}-multiplier`}
                 type="number"
                 step="0.1"
-                value={parameters.atrMultiplier || 1.5}
-                onChange={(e) => onParameterChange(strategy.id, 'atrMultiplier', Number(e.target.value))}
+                value={parameters.atr_multiplier || 1.5}
+                onChange={(e) => onParameterChange(strategy.id, 'atr_multiplier', Number(e.target.value))}
                 className="mt-1"
               />
             </div>
           </div>
         );
-
       case 'VOLUME':
         return (
           <div className="grid md:grid-cols-3 gap-4">
@@ -154,8 +153,8 @@ export default function StrategyCard({
               <Input
                 id={`${strategy.id}-time`}
                 type="number"
-                value={parameters.timeRange || 20}
-                onChange={(e) => onParameterChange(strategy.id, 'timeRange', Number(e.target.value))}
+                value={parameters.period || 20}
+                onChange={(e) => onParameterChange(strategy.id, 'period', Number(e.target.value))}
                 className="mt-1"
               />
             </div>
@@ -186,7 +185,6 @@ export default function StrategyCard({
             </div>
           </div>
         );
-
       default:
         return null;
     }
@@ -196,19 +194,30 @@ export default function StrategyCard({
     <div className="space-y-4">
       {/* Strategy Selection Card */}
       <div
-        className={`strategy-card rounded-lg p-4 cursor-pointer border-2 transition-all ${
-          isSelected
+        className={`strategy-card rounded-lg p-4 cursor-pointer border-2 transition-all ${isSelected
             ? `${strategy.bgColor} ${strategy.borderColor} selected`
             : "border-border hover:border-border bg-card"
-        }`}
+          }`}
         onClick={() => onToggle(strategy.id)}
       >
         <div className="flex items-center space-x-3">
-          <Checkbox
-            checked={isSelected}
-            onChange={() => onToggle(strategy.id)}
-            className={`w-4 h-4 ${strategy.color}`}
-          />
+          {/* 在单选模式下使用单选样式，多选模式下使用复选框样式 */}
+          {isSingleSelect ? (
+            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${isSelected
+                ? `${strategy.color.replace('text-', 'bg-')} border-current`
+                : 'border-gray-300'
+              }`}>
+              {isSelected && (
+                <div className="w-2 h-2 rounded-full bg-white"></div>
+              )}
+            </div>
+          ) : (
+            <Checkbox
+              checked={isSelected}
+              onChange={() => onToggle(strategy.id)}
+              className={`w-4 h-4 ${strategy.color}`}
+            />
+          )}
           <i className={`${strategy.icon} ${strategy.color}`}></i>
           <div>
             <h4 className="font-semibold text-foreground">{strategy.name}</h4>
@@ -216,7 +225,6 @@ export default function StrategyCard({
           </div>
         </div>
       </div>
-
       {/* Strategy Parameters */}
       {isSelected && (
         <div className={`${strategy.bgColor} rounded-lg p-4`}>

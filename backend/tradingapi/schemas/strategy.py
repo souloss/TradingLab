@@ -1,4 +1,4 @@
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, Tag, model_validator
 from pydantic.alias_generators import to_camel  # 官方驼峰生成器
@@ -109,7 +109,7 @@ class ATRParameters(BaseModel):
         description="ATR计算周期",
         json_schema_extra={"examples": [14]},
     )
-    high_low_period: int = Field(
+    period: int = Field(
         default=20,
         ge=1,
         le=100,
@@ -126,7 +126,7 @@ class ATRParameters(BaseModel):
 
     def to_strategies_config(self) -> ATRBreakoutStrategyConfig:
         return ATRBreakoutStrategyConfig(
-            breakout_period=self.high_low_period,
+            breakout_period=self.period,
             atr_multiplier=self.atr_multiplier,
             atr_config=ATRConfig(period=self.atr_period),
         )
@@ -137,7 +137,7 @@ class VolumeParameters(BaseModel):
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
-    time_range: int = Field(
+    period: int = Field(
         default=20,
         description="成交量统计周期",
         json_schema_extra={"examples": [20]},
@@ -157,23 +157,34 @@ class VolumeParameters(BaseModel):
         return VolumeSpikeStrategyConfig(
             high_multiplier=self.sell_volume_multiplier,
             low_multiplier=self.buy_volume_multiplier,
-            period=self.time_range,
+            period=self.period,
             volume_config=VolumeConfig(
-                ma_periods=[self.time_range]
+                ma_periods=[self.period]
             )
         )
 
 
 # ===== 统一策略模型 =====
-class StrategyItem(BaseModel):
+class Strategy(BaseModel):
     """策略配置基类"""
 
     type: Literal["MACD", "MA", "ATR", "VOLUME"] = Field(
         ..., description="策略类型标识", json_schema_extra={"examples": ["MACD"]}
     )
-    parameters: Union[
-        Annotated[MACDParameters, Tag("MACD")],
-        Annotated[MAParameters, Tag("MA")],
-        Annotated[ATRParameters, Tag("ATR")],
-        Annotated[VolumeParameters, Tag("VOLUME")],
+    parameters: Optional[
+        Union[
+            Annotated[MACDParameters, Tag("MACD")],
+            Annotated[MAParameters, Tag("MA")],
+            Annotated[ATRParameters, Tag("ATR")],
+            Annotated[VolumeParameters, Tag("VOLUME")],
+        ]
     ] = Field(..., description="策略具体参数配置")
+
+    optimize: bool = Field(..., description="是否进行自动参数调优")
+
+    @model_validator(mode="after")
+    def check_params_required(self) -> "Strategy":
+        """验证 optimize 与 parameters 的逻辑关系"""
+        if not self.optimize and self.parameters is None:
+            raise ValueError("当 optimize=False 时，必须提供 parameters 参数")
+        return self

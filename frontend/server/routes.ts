@@ -376,12 +376,12 @@ function generateMASignal(data: any[], params: any): 'BUY' | 'SELL' | 'HOLD' {
 }
 
 function generateATRSignal(data: any[], params: any): 'BUY' | 'SELL' | 'HOLD' {
-  if (data.length < params.atrPeriod) return 'HOLD';
+  if (data.length < params.atr_period) return 'HOLD';
 
   // Simple ATR-based signal
-  const atr = calculateATR(data, params.atrPeriod);
+  const atr = calculateATR(data, params.atr_period);
   const currentPrice = data[data.length - 1].close;
-  const sma = calculateSMA(data.map(d => d.close), params.highLowPeriod);
+  const sma = calculateSMA(data.map(d => d.close), params.period);
 
   if (atr.length === 0 || sma.length === 0) return 'HOLD';
 
@@ -389,16 +389,16 @@ function generateATRSignal(data: any[], params: any): 'BUY' | 'SELL' | 'HOLD' {
   const currentATR = atr[atr.length - 1];
 
   // Buy if price is above SMA + ATR, sell if below SMA - ATR
-  if (currentPrice > currentSMA + (currentATR * params.atrMultiplier)) return 'BUY';
-  if (currentPrice < currentSMA - (currentATR * params.atrMultiplier)) return 'SELL';
+  if (currentPrice > currentSMA + (currentATR * params.atr_multiplier)) return 'BUY';
+  if (currentPrice < currentSMA - (currentATR * params.atr_multiplier)) return 'SELL';
 
   return 'HOLD';
 }
 
 function generateVolumeSignal(data: any[], params: any): 'BUY' | 'SELL' | 'HOLD' {
-  if (data.length < params.timeRange) return 'HOLD';
+  if (data.length < params.period) return 'HOLD';
 
-  const volumes = data.slice(-params.timeRange).map(d => d.volume);
+  const volumes = data.slice(-params.period).map(d => d.volume);
   const avgVolume = volumes.reduce((sum, vol) => sum + vol, 0) / volumes.length;
   const currentVolume = data[data.length - 1].volume;
 
