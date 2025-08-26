@@ -4,12 +4,9 @@ from pathlib import Path
 from typing import AsyncGenerator
 
 from loguru import logger
-from sqlalchemy.ext.asyncio import (AsyncSession, async_sessionmaker,
-                                    create_async_engine)
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 from sqlmodel import SQLModel
-
-import tradingapi.models
 
 from .config import app_config
 

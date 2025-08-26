@@ -1,11 +1,8 @@
-import json
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
-from uuid import UUID
+from typing import Any, Dict, List, Literal
 
-from pydantic import (BaseModel, ConfigDict, Field, field_serializer, field_validator,
-                      model_validator)
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
 from tradingapi.strategyv2.model import BacktestStats  # 官方驼峰生成器
@@ -19,11 +16,10 @@ class TradeType(str, Enum):
     SELL = "SELL"
     HOLD = "HOLD"
 
+
 # 图表数据响应模型
 class ChartData(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True
-    )
+    model_config = ConfigDict(populate_by_name=True)
     chart_date: datetime = Field(..., alias="date", description="K线日期")
     open: float = Field(..., description="开盘价")
     high: float = Field(..., description="最高价")
@@ -35,6 +31,7 @@ class ChartData(BaseModel):
     extra_fields: Dict[str, Any] = Field(
         default_factory=dict, description="动态存储的额外字段"
     )
+
 
 # 单股回测响应模型
 class BacktestResponse(BaseModel):
@@ -49,7 +46,10 @@ class BacktestResponse(BaseModel):
     stock_name: str = Field(..., alias="stockName", description="股票名称")
 
     chart_data: List[ChartData] = Field(..., alias="chartData", description="图表数据")
-    backtest_stats: BacktestStats = Field(..., alias="backtestStats", description="回测统计")
+    backtest_stats: BacktestStats = Field(
+        ..., alias="backtestStats", description="回测统计"
+    )
+
 
 # 单股回测请求模型
 class BacktestRequest(BaseModel):
@@ -64,9 +64,7 @@ class BacktestRequest(BaseModel):
     end_date: date = Field(
         ..., description="回测结束日期（YYYY-MM-DD）", examples=["2025-08-10"]
     )
-    strategy: Strategy = Field(
-        ..., description="策略配置"
-    )
+    strategy: Strategy = Field(..., description="策略配置")
 
     @model_validator(mode="after")
     def validate_dates(self) -> "BacktestRequest":
@@ -104,9 +102,7 @@ class SelectStockBacktestReq(BaseModel):
         None,
         description="股票高级过滤器",
     )
-    strategies: List[Strategy] = Field(
-        ..., description="策略配置列表"
-    )
+    strategies: List[Strategy] = Field(..., description="策略配置列表")
 
 
 class StockResult(BaseModel):

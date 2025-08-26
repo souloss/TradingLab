@@ -10,7 +10,6 @@ from tradingapi.models.stock_basic_info import StockBasicInfo
 
 from ..base import DataSourceName, StockDataSource
 from ..manager import manager
-from .exchange import fetch_bj_stocks, fetch_sh_stocks, fetch_sz_stocks
 
 
 @manager.register_data_source
@@ -44,9 +43,9 @@ class TX(StockDataSource):
             logger.error(f"健康检查失败, exception:{ex}")
             return False
 
-    def normalization(self, df: pd.DataFrame, symbol:str) -> pd.DataFrame:
+    def normalization(self, df: pd.DataFrame, symbol: str) -> pd.DataFrame:
         # 1手=100股
-        df['amount'] = df['amount'] * 100
+        df["amount"] = df["amount"] * 100
         df = df.rename(
             columns={
                 "date": OHLCVExtendedSchema.timestamp,
@@ -67,9 +66,7 @@ class TX(StockDataSource):
 
         df[OHLCVExtendedSchema.symbol] = symbol
         df = df.set_index(OHLCVExtendedSchema.timestamp)
-        df = df.reindex(
-                columns=list(OHLCVExtendedSchema.to_schema().columns.keys())
-            )
+        df = df.reindex(columns=list(OHLCVExtendedSchema.to_schema().columns.keys()))
         return OHLCVExtendedSchema.validate(df)
 
     @manager.register_method(weight=1.2, max_requests_per_minute=30, max_concurrent=5)

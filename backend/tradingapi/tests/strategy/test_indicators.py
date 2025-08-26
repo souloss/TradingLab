@@ -2,25 +2,26 @@
 测试指标计算器
 """
 
-import numpy as np
 import pandas as pd
 import pytest
 
 from tradingapi.strategy.base import IndicatorCategory
-from tradingapi.strategy.config.indicators import (ATRConfig,
-                                                   BollingerBandsConfig,
-                                                   MACDConfig, MAConfig,
-                                                   RSIConfig, VolumeConfig)
+from tradingapi.strategy.config.indicators import (
+    ATRConfig,
+    BollingerBandsConfig,
+    MACDConfig,
+    MAConfig,
+    RSIConfig,
+    VolumeConfig,
+)
 from tradingapi.strategy.config_manager import ConfigManager
 from tradingapi.strategy.exceptions import IndicatorNotFoundError
+
 # 确保所有指标模块都被导入和注册
-from tradingapi.strategy.indicators import momentum, trend, volatility, volume
-from tradingapi.strategy.indicators.base import (IndicatorManager,
-                                                 IndicatorRegistry)
+from tradingapi.strategy.indicators.base import IndicatorManager, IndicatorRegistry
 from tradingapi.strategy.indicators.momentum import MACD, RSICalculator
 from tradingapi.strategy.indicators.trend import MovingAverage
-from tradingapi.strategy.indicators.volatility import (AverageTrueRange,
-                                                       BollingerBands)
+from tradingapi.strategy.indicators.volatility import AverageTrueRange, BollingerBands
 from tradingapi.strategy.indicators.volume import VolumeIndicator
 
 

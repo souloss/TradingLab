@@ -9,12 +9,14 @@ import pandas as pd
 from loguru import logger
 
 from tradingapi.fetcher.interface import OHLCVExtendedSchema
-
 from tradingapi.strategy.base import SignalResult, SignalType, StrategyConfig
 from tradingapi.strategy.config import BaseConfig
 from tradingapi.strategy.config_manager import ConfigManager
-from tradingapi.strategy.exceptions import (ConfigurationError, StrategyError,
-                          StrategyNotFoundError)
+from tradingapi.strategy.exceptions import (
+    ConfigurationError,
+    StrategyError,
+    StrategyNotFoundError,
+)
 from tradingapi.strategy.manager import IndicatorManager
 
 
@@ -115,7 +117,9 @@ class StrategyBase(Generic[TStrategyConfig]):
                         df[col] = result.values[col]
                 except Exception as e:
                     missing_indicators.append(indicator_name)
-                    logger.error(f"Failed to calculate indicator {indicator_name}: {e}, config:{indicator_configs[indicator_name]}")
+                    logger.error(
+                        f"Failed to calculate indicator {indicator_name}: {e}, config:{indicator_configs[indicator_name]}"
+                    )
 
         if missing_indicators:
             raise StrategyError(f"Missing required indicators: {missing_indicators}")
@@ -135,7 +139,6 @@ class StrategyBase(Generic[TStrategyConfig]):
     @abstractmethod
     def generate_signals(self, df: pd.DataFrame) -> SignalResult:
         """生成交易信号"""
-        pass
 
     @classmethod
     def get_default_parameters(cls) -> TStrategyConfig:
@@ -165,7 +168,6 @@ class StrategyBase(Generic[TStrategyConfig]):
         self, df: pd.DataFrame, signals: pd.Series
     ) -> pd.Series:
         """计算默认置信度"""
-        pass
 
 
 class TrendStrategy(StrategyBase[TStrategyConfig]):

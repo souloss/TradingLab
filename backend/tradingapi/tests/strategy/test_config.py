@@ -8,15 +8,11 @@ from typing import Dict, List
 import pytest
 
 from tradingapi.strategy.config.base import BaseConfig
-from tradingapi.strategy.config.indicators import (ATRConfig,
-                                                   BollingerBandsConfig,
-                                                   EMAConfig, KDJConfig,
-                                                   MACDConfig, MAConfig,
-                                                   RSIConfig, VolumeConfig)
+from tradingapi.strategy.config.indicators import MAConfig, RSIConfig
 from tradingapi.strategy.config.strategies import (
-    ATRBreakoutStrategyConfig, BollingerBandsStrategyConfig,
-    MACDStrategyConfig, MACrossStrategyConfig, RSIStrategyConfig,
-    VolumeSpikeStrategyConfig)
+    MACrossStrategyConfig,
+    RSIStrategyConfig,
+)
 from tradingapi.strategy.exceptions import ConfigurationError
 
 

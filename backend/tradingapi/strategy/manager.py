@@ -4,16 +4,16 @@
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import pandas as pd
 from loguru import logger
 
-from .base import SignalResult, SignalType, StrategyConfig
+from .base import SignalType, StrategyConfig
 from .config_manager import ConfigManager
-from .exceptions import ConfigurationError, StrategyNotFoundError
+from .exceptions import ConfigurationError
 from .indicators.base import IndicatorManager
-from .strategies.base import StrategyBase, StrategyRegistry
+from .strategies.base import StrategyRegistry
 
 
 @dataclass
@@ -65,7 +65,6 @@ class SignalManager:
     def _register_builtin_strategies(self):
         """注册内置策略类"""
         # 导入所有策略模块，这样装饰器会自动注册策略
-        from .strategies import mean_reversion, momentum, trend_following
 
     def add_strategy(self, strategy_config: StrategyConfig):
         """添加策略"""

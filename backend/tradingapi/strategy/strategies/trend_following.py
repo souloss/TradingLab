@@ -5,14 +5,15 @@
 from typing import Dict, List
 
 import pandas as pd
-from loguru import logger
 
 from tradingapi.fetcher.interface import OHLCVExtendedSchema
-from tradingapi.strategy.config.base import BaseConfig
-
 from tradingapi.strategy.base import SignalResult, SignalType
-from tradingapi.strategy.config import (ATRBreakoutStrategyConfig, MACDStrategyConfig,
-                      MACrossStrategyConfig)
+from tradingapi.strategy.config import (
+    ATRBreakoutStrategyConfig,
+    MACDStrategyConfig,
+    MACrossStrategyConfig,
+)
+from tradingapi.strategy.config.base import BaseConfig
 from tradingapi.strategy.strategies.base import TrendStrategy, register_strategy
 
 
@@ -58,7 +59,7 @@ class MACrossStrategy(TrendStrategy[MACrossStrategyConfig]):
         )
 
         # 设置信号
-        signals.loc[golden_cross] = SignalType.BUY.value 
+        signals.loc[golden_cross] = SignalType.BUY.value
         signals.loc[death_cross] = SignalType.SELL.value
 
         return SignalResult(
@@ -164,7 +165,9 @@ class ATRBreakoutStrategy(TrendStrategy[ATRBreakoutStrategyConfig]):
         config = self.strategy_config
 
         # 计算均值（使用简单移动平均）
-        mean = df[OHLCVExtendedSchema.close].rolling(window=config.breakout_period).mean()
+        mean = (
+            df[OHLCVExtendedSchema.close].rolling(window=config.breakout_period).mean()
+        )
 
         # 计算上下轨
         upper_band = mean + df["ATR"] * config.atr_multiplier
@@ -181,8 +184,12 @@ class ATRBreakoutStrategy(TrendStrategy[ATRBreakoutStrategyConfig]):
         signals.loc[sell_signals] = SignalType.SELL.value
 
         # 计算置信度（基于偏离程度）
-        buy_deviation = (lower_band - df[OHLCVExtendedSchema.close]) / (df["ATR"] * config.atr_multiplier)
-        sell_deviation = (df[OHLCVExtendedSchema.close] - upper_band) / (df["ATR"] * config.atr_multiplier)
+        buy_deviation = (lower_band - df[OHLCVExtendedSchema.close]) / (
+            df["ATR"] * config.atr_multiplier
+        )
+        sell_deviation = (df[OHLCVExtendedSchema.close] - upper_band) / (
+            df["ATR"] * config.atr_multiplier
+        )
 
         confidence = pd.Series(0.0, index=df.index)
         confidence.loc[buy_signals] = buy_deviation.loc[buy_signals].clip(0, 1)

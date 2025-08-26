@@ -8,10 +8,10 @@ class DataSourceName(Enum):
     """数据源名称枚举"""
 
     EASTMONEY = "东方财富"
-    Legulegu  = "乐咕乐股"
-    TX        = "腾讯"
-    Sina      = "新浪"
-    XUEQIU    = "雪球"
+    Legulegu = "乐咕乐股"
+    TX = "腾讯"
+    Sina = "新浪"
+    XUEQIU = "雪球"
 
 
 class StockDataSource(ABC):
@@ -26,7 +26,6 @@ class StockDataSource(ABC):
     @abstractmethod
     async def health_check(self) -> bool:
         """检查数据源是否可用"""
-        pass
 
     def set_proxy(self, proxy: str):
         """设置代理"""
@@ -39,7 +38,7 @@ class StockDataSource(ABC):
 
 import asyncio
 from functools import wraps
-from typing import Any, Callable, Coroutine, Optional, Union
+from typing import Any, Callable, Coroutine, Optional
 
 from aiolimiter import AsyncLimiter
 

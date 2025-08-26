@@ -1,11 +1,9 @@
-from datetime import date, datetime
+from datetime import date
 from typing import List, Optional, Sequence
 
-from loguru import logger
 import pandas as pd
-from sqlalchemy import Column, DateTime, UniqueConstraint, func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import Field, SQLModel
 
 from tradingapi.fetcher.interface import OHLCVExtendedSchema
 from tradingapi.models.stock_daily_data import StockDailyData
@@ -35,9 +33,11 @@ class StockDailyRepository(BaseRepository[StockDailyData]):
         res = await self.session.execute(stmt)
         return res.scalars().all()
 
-    async def upsert_stock_dailys_bydf(self, df:pd.DataFrame):
+    async def upsert_stock_dailys_bydf(self, df: pd.DataFrame):
         datas = dataframe_to_daily_data(df)
-        return await self.bulk_upsert(datas, conflict_columns=[StockDailyData.symbol, StockDailyData.trade_date])
+        return await self.bulk_upsert(
+            datas, conflict_columns=[StockDailyData.symbol, StockDailyData.trade_date]
+        )
 
 
 def dataframe_to_daily_data(df: pd.DataFrame) -> List[StockDailyData]:
@@ -89,6 +89,7 @@ def dataframe_to_daily_data(df: pd.DataFrame) -> List[StockDailyData]:
         daily_data_list.append(daily_data)
 
     return daily_data_list
+
 
 def daily_data_to_dataframe(daily_data_list: List[StockDailyData]):
     """

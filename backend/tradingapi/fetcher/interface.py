@@ -1,11 +1,11 @@
 from typing import Protocol
-from pandera.typing import Series, DataFrame, Index
-import pandera.extensions as extensions
 
 import pandas as pd
 import pandera.pandas as pa
+from pandera.typing import DataFrame, Index, Series
 
 from tradingapi.models.stock_basic_info import StockBasicInfo
+
 
 class OHLCVSchema(pa.DataFrameModel):
     # 时间戳索引（主键）
@@ -80,12 +80,12 @@ class StockInfoFetcher(Protocol):
 
     async def get_all_stock_basic_info(self): ...
 
-    async def get_stock_basic_info(self, exchange, symbol):...
+    async def get_stock_basic_info(self, exchange, symbol): ...
 
     @pa.check_types
     async def fetch_stock_daily_data(
         self, stock: StockBasicInfo, start_date: str, end_date: str
-    ) -> DataFrame[OHLCVExtendedSchema]: 
+    ) -> DataFrame[OHLCVExtendedSchema]:
         """
         获取股票日线数据的接口
         """

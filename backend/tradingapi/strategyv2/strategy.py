@@ -1,12 +1,11 @@
 import datetime
-import inspect
-from itertools import product
 from typing import Any, Callable, Dict, Union
+
 import numpy as np
 import pandas as pd
-from talib import ATR, SMA, MACD, MA
-from backtesting import Strategy, Backtest
+from backtesting import Strategy
 from backtesting.lib import crossover
+from talib import ATR, MA, MACD, SMA
 
 
 def make_json_safe(value):
@@ -32,6 +31,7 @@ def make_json_safe(value):
 def crossunder(a, b):
     """Return True if series2 just crossed over (above) series1."""
     return crossover(b, a)
+
 
 class BaseSerializableStrategy(Strategy):
     """
@@ -77,6 +77,7 @@ class BaseSerializableStrategy(Strategy):
         """
         基类约束函数，子类应覆盖此方法
         """
+
         def constraint_func(param):
             # 默认情况下，接受所有参数组合
             return True
@@ -97,11 +98,12 @@ class MACDStrategy(BaseSerializableStrategy):
         signal_period: 信号线周期，默认9(日)
 
     买卖逻辑:
-        买入条件: 
+        买入条件:
             - DIF上穿DEA(金叉)且当前无持仓
-        卖出条件: 
+        卖出条件:
             - DIF下穿DEA(死叉)且当前有持仓
     """
+
     fast_period = 12
     slow_period = 26
     signal_period = 9
@@ -158,11 +160,12 @@ class MAStrategy(BaseSerializableStrategy):
         long_period: 长期均线周期，默认30(日)
 
     买卖逻辑:
-        买入条件: 
+        买入条件:
             - 短期均线上穿长期均线(金叉)且当前无持仓
-        卖出条件: 
+        卖出条件:
             - 短期均线下穿长期均线(死叉)且当前有持仓
     """
+
     short_period = 10  # 短期均线
     long_period = 30  # 长期均线
 
@@ -222,6 +225,7 @@ class VolumeSpikeStrategy(BaseSerializableStrategy):
             - 价格处于近期最高点附近(天价)
             - 当前有持仓
     """
+
     period = 60
     sell_volume_multiplier = 3.0
     buy_volume_multiplier = 0.4
@@ -295,11 +299,12 @@ class ATRMeanReversionStrategy(BaseSerializableStrategy):
         atr_multiplier: 波动率乘数，默认1.5(用于确定偏离阈值)
 
     买卖逻辑:
-        买入条件: 
+        买入条件:
             - 价格低于均线减去ATR的一定倍数(超卖区域)且当前无持仓
-        卖出条件: 
+        卖出条件:
             - 价格高于均线加上ATR的一定倍数(超买区域)且当前有持仓
     """
+
     period = 20  # 均线周期
     atr_period = 14  # ATR 周期
     atr_multiplier = 1.5  # 偏离倍数
@@ -318,7 +323,7 @@ class ATRMeanReversionStrategy(BaseSerializableStrategy):
             if not self.position:  # 低估 → 买入
                 self.buy()
         elif price > ma + self.atr_multiplier * atr:
-            if self.position:      # 高估 → 平仓
+            if self.position:  # 高估 → 平仓
                 self.position.close()
 
     @classmethod
@@ -338,17 +343,17 @@ class ATRMeanReversionStrategy(BaseSerializableStrategy):
         """返回参数优化空间字典，使用range或列表代替np.ndarray"""
         # 对于浮点数参数，使用列表代替np.arange
         return {
-            "period": range(10, 60, 1),  # 均线周期范围
-            "atr_period": range(5, 30, 2),  # ATR周期范围
+            "period": range(10, 60, 3),  # 均线周期范围
+            "atr_period": range(5, 30, 5),  # ATR周期范围
             "atr_multiplier": [
-                round(x, 1) for x in np.arange(0.3, 6.0, 0.3)
+                round(x, 1) for x in np.arange(0.3, 6.0, 0.6)
             ],  # 波动率乘数范围
         }
 
 
 StrategyMap = {
-    "MACD":MACDStrategy,
-    "MA":MAStrategy,
-    "ATR":ATRMeanReversionStrategy,
-    "VOLUME":VolumeSpikeStrategy,
+    "MACD": MACDStrategy,
+    "MA": MAStrategy,
+    "ATR": ATRMeanReversionStrategy,
+    "VOLUME": VolumeSpikeStrategy,
 }

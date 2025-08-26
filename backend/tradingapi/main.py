@@ -1,14 +1,13 @@
 import json
 import math
 import sys
-from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, ORJSONResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -16,16 +15,17 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from tradingapi.api.v1 import backtest_controller, stock_controller
 from tradingapi.core.config import app_config
 from tradingapi.core.context import request_context_middleware
-from tradingapi.core.db import db_manager
-from tradingapi.core.exceptions import (BusinessException,
-                                        business_exception_handler,
-                                        general_exception_handler,
-                                        http_exception_handler,
-                                        validation_exception_handler)
+from tradingapi.core.exceptions import (
+    BusinessException,
+    business_exception_handler,
+    general_exception_handler,
+    http_exception_handler,
+    validation_exception_handler,
+)
 from tradingapi.core.initializer import lifespan
 from tradingapi.core.metrics import metrics_collector, metrics_middleware
 from tradingapi.fetcher.manager import manager
-from fastapi.responses import ORJSONResponse
+
 
 class SafeJSONResponse(JSONResponse):
     def render(self, content) -> bytes:

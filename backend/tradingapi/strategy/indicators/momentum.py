@@ -5,9 +5,8 @@
 import pandas as pd
 
 from tradingapi.fetcher.interface import OHLCVExtendedSchema
-from tradingapi.strategy.config import KDJConfig, MACDConfig, RSIConfig
-
 from tradingapi.strategy.base import IndicatorCategory, IndicatorResult
+from tradingapi.strategy.config import KDJConfig, MACDConfig, RSIConfig
 from tradingapi.strategy.indicators.base import IndicatorCalculator, register_indicator
 
 

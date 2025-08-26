@@ -2,27 +2,19 @@
 测试策略类
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import numpy as np
 import pandas as pd
 import pytest
 
-from tradingapi.strategy.base import SignalResult, SignalType, StrategyConfig
+from tradingapi.strategy.base import SignalResult, StrategyConfig
 from tradingapi.strategy.config_manager import ConfigManager
 from tradingapi.strategy.exceptions import StrategyError, StrategyNotFoundError
 from tradingapi.strategy.indicators.base import IndicatorManager
-from tradingapi.strategy.strategies.base import (MeanReversionStrategy,
-                                                 MomentumStrategy,
-                                                 StrategyBase,
-                                                 StrategyRegistry,
-                                                 TrendStrategy)
-from tradingapi.strategy.strategies.mean_reversion import \
-    BollingerBandsStrategy
-from tradingapi.strategy.strategies.momentum import (RSIStrategy,
-                                                     VolumeSpikeStrategy)
-from tradingapi.strategy.strategies.trend_following import (
-    ATRBreakoutStrategy, MACDStrategy, MACrossStrategy)
+from tradingapi.strategy.strategies.base import StrategyRegistry
+from tradingapi.strategy.strategies.mean_reversion import BollingerBandsStrategy
+from tradingapi.strategy.strategies.momentum import RSIStrategy
+from tradingapi.strategy.strategies.trend_following import MACrossStrategy
 
 
 class TestStrategyRegistry:

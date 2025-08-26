@@ -2,13 +2,17 @@
 测试基础数据结构和枚举
 """
 
-import numpy as np
 import pandas as pd
 import pytest
 
-from tradingapi.strategy.base import (IndicatorCategory, IndicatorResult,
-                                      MarketRegime, SignalResult, SignalType,
-                                      StrategyConfig)
+from tradingapi.strategy.base import (
+    IndicatorCategory,
+    IndicatorResult,
+    MarketRegime,
+    SignalResult,
+    SignalType,
+    StrategyConfig,
+)
 
 
 class TestSignalType:

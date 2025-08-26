@@ -3,10 +3,9 @@
 包含枚举、数据结构、抽象类等
 """
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Dict, List, Optional, TypeVar
+from typing import Any, Dict, Optional
 
 import pandas as pd
 

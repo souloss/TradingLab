@@ -4,10 +4,15 @@
 """
 
 # 导入所有策略模块，这样装饰器会自动注册策略
-from . import mean_reversion, momentum, trend_following
 # 导出策略基类和注册机制
-from .base import (MeanReversionStrategy, MomentumStrategy, StrategyBase,
-                   StrategyRegistry, TrendStrategy, register_strategy)
+from .base import (
+    MeanReversionStrategy,
+    MomentumStrategy,
+    StrategyBase,
+    StrategyRegistry,
+    TrendStrategy,
+    register_strategy,
+)
 
 __all__ = [
     "StrategyBase",

@@ -1,6 +1,6 @@
 # models/stock_basic_info.py
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 from sqlalchemy import Column, DateTime, func
 from sqlmodel import Field, SQLModel

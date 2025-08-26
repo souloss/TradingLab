@@ -46,7 +46,7 @@ class EASTMONEY(StockDataSource):
 
     def normalization(self, df: pd.DataFrame) -> pd.DataFrame:
         # 手转为股
-        df['成交量'] = df['成交量'] * 100
+        df["成交量"] = df["成交量"] * 100
         df = df.rename(
             columns={
                 "日期": OHLCVExtendedSchema.timestamp,
@@ -81,10 +81,14 @@ class EASTMONEY(StockDataSource):
             stocks["日期"], format="%Y%m%d", errors="coerce"
         )
         # 将 NaT 转为 None，Timestamp 转为 date
-        stocks["上市时间"] = stocks["上市时间"].apply(lambda x: x.date() if pd.notna(x) else None)
+        stocks["上市时间"] = stocks["上市时间"].apply(
+            lambda x: x.date() if pd.notna(x) else None
+        )
         return stocks
 
-    def _log_and_drop_invalid_rows(self, df: pd.DataFrame, required_cols: list) -> pd.DataFrame:
+    def _log_and_drop_invalid_rows(
+        self, df: pd.DataFrame, required_cols: list
+    ) -> pd.DataFrame:
         """
         打印必填字段缺失的行，并删除
         """
@@ -95,7 +99,7 @@ class EASTMONEY(StockDataSource):
             )
         return df.loc[~mask_invalid].copy()
 
-    async def _fetch_stock_detail(self, exchange:str, symbol: str):
+    async def _fetch_stock_detail(self, exchange: str, symbol: str):
         def _fetch():
             stock_info = ak.stock_individual_info_em(symbol=symbol)
             info_dict = dict(zip(stock_info["item"], stock_info["value"]))
@@ -146,7 +150,10 @@ class EASTMONEY(StockDataSource):
             stocks[col] = None
 
         # 并发获取股票详情
-        tasks = [self._fetch_stock_detail(stock["交易所"], stock["证券代码"]) for stock in stocks]
+        tasks = [
+            self._fetch_stock_detail(stock["交易所"], stock["证券代码"])
+            for stock in stocks
+        ]
         results = await asyncio.gather(*tasks)
 
         # 将结果填充回 DataFrame
@@ -160,7 +167,9 @@ class EASTMONEY(StockDataSource):
         # 清洗
         stocks = self._clean_numeric_columns(stocks)
         stocks = self._format_listing_date(stocks)
-        stocks = self._log_and_drop_invalid_rows(stocks, required_cols=["名称", "交易所", "板块"])
+        stocks = self._log_and_drop_invalid_rows(
+            stocks, required_cols=["名称", "交易所", "板块"]
+        )
 
         # 排序列
         final_columns = [

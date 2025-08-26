@@ -22,7 +22,6 @@ class BaseService(Generic[ModelType, RepositoryType], ABC):
     @abstractmethod
     def repository_class(self) -> Type[RepositoryType]:
         """子类需要实现这个属性，返回对应的Repository类"""
-        pass
 
     @property
     def repository(self) -> RepositoryType:

@@ -1,6 +1,6 @@
 from typing import Any, Generic, List, Optional, Sequence, TypeVar, Union
 
-from sqlalchemy import func,select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel, inspect
@@ -211,7 +211,9 @@ class BaseRepository(Generic[ModelType]):
         conflict_cols = conflict_columns or pk_columns
         # 可更新列：用户未传则用 非冲突列
         all_columns = [col.name for col in table.columns]
-        update_cols = update_columns or [c for c in all_columns if c not in conflict_cols]
+        update_cols = update_columns or [
+            c for c in all_columns if c not in conflict_cols
+        ]
 
         for i in range(0, len(objs), batch_size):
             chunk = objs[i : i + batch_size]

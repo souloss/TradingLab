@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Optional, Sequence
+from typing import Optional
 
 from sqlalchemy import Column, DateTime, UniqueConstraint, func
 from sqlmodel import Field, SQLModel
@@ -43,8 +43,6 @@ class StockDailyData(StockDailyDataBase, table=True):
 
 class StockDailyDataCreate(StockDailyDataBase):
     """创建股票每日数据请求模型"""
-
-    pass
 
 
 class StockDailyDataUpdate(SQLModel):

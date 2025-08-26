@@ -5,12 +5,23 @@
 
 from typing import Any, Dict
 
-from .config import (ATRBreakoutStrategyConfig, ATRConfig, BaseConfig,
-                     BollingerBandsConfig, BollingerBandsStrategyConfig,
-                     EMAConfig, KDJConfig, MACDConfig, MACDStrategyConfig,
-                     MAConfig, MACrossStrategyConfig, RSIConfig,
-                     RSIStrategyConfig, VolumeConfig,
-                     VolumeSpikeStrategyConfig)
+from .config import (
+    ATRBreakoutStrategyConfig,
+    ATRConfig,
+    BaseConfig,
+    BollingerBandsConfig,
+    BollingerBandsStrategyConfig,
+    EMAConfig,
+    KDJConfig,
+    MACDConfig,
+    MACDStrategyConfig,
+    MAConfig,
+    MACrossStrategyConfig,
+    RSIConfig,
+    RSIStrategyConfig,
+    VolumeConfig,
+    VolumeSpikeStrategyConfig,
+)
 from .exceptions import ConfigurationError
 
 

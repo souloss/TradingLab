@@ -1,7 +1,7 @@
 import traceback
 from typing import Union
 
-from fastapi import HTTPException, Request
+from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from loguru import logger

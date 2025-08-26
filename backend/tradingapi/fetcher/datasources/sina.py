@@ -10,7 +10,6 @@ from tradingapi.models.stock_basic_info import StockBasicInfo
 
 from ..base import DataSourceName, StockDataSource
 from ..manager import manager
-from .exchange import fetch_bj_stocks, fetch_sh_stocks, fetch_sz_stocks
 
 
 @manager.register_data_source
@@ -44,7 +43,7 @@ class Sina(StockDataSource):
             logger.error(f"健康检查失败, exception:{ex}")
             return False
 
-    def normalization(self, df: pd.DataFrame, symbol:str) -> pd.DataFrame:
+    def normalization(self, df: pd.DataFrame, symbol: str) -> pd.DataFrame:
         # 1手=100股
         df = df.rename(
             columns={

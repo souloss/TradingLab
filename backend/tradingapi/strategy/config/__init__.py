@@ -4,12 +4,24 @@
 """
 
 from .base import BaseConfig
-from .indicators import (ATRConfig, BollingerBandsConfig, EMAConfig, KDJConfig,
-                         MACDConfig, MAConfig, RSIConfig, VolumeConfig)
-from .strategies import (ATRBreakoutStrategyConfig,
-                         BollingerBandsStrategyConfig, MACDStrategyConfig,
-                         MACrossStrategyConfig, RSIStrategyConfig,
-                         VolumeSpikeStrategyConfig)
+from .indicators import (
+    ATRConfig,
+    BollingerBandsConfig,
+    EMAConfig,
+    KDJConfig,
+    MACDConfig,
+    MAConfig,
+    RSIConfig,
+    VolumeConfig,
+)
+from .strategies import (
+    ATRBreakoutStrategyConfig,
+    BollingerBandsStrategyConfig,
+    MACDStrategyConfig,
+    MACrossStrategyConfig,
+    RSIStrategyConfig,
+    VolumeSpikeStrategyConfig,
+)
 
 __all__ = [
     "BaseConfig",

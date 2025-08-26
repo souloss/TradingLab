@@ -24,18 +24,15 @@ class IndicatorCalculator(ABC, Generic[TConfig]):
     @abstractmethod
     def name(self) -> str:
         """指标名称"""
-        pass
 
     @property
     @abstractmethod
     def category(self) -> IndicatorCategory:
         """指标类别"""
-        pass
 
     @abstractmethod
     def calculate(self, df: pd.DataFrame, config: TConfig) -> IndicatorResult:
         """计算技术指标"""
-        pass
 
     def validate_inputs(self, df: pd.DataFrame) -> bool:
         """验证输入数据"""

@@ -6,8 +6,14 @@
 from dataclasses import dataclass, field
 
 from .base import BaseConfig
-from .indicators import (ATRConfig, BollingerBandsConfig, MACDConfig, MAConfig,
-                         RSIConfig, VolumeConfig)
+from .indicators import (
+    ATRConfig,
+    BollingerBandsConfig,
+    MACDConfig,
+    MAConfig,
+    RSIConfig,
+    VolumeConfig,
+)
 
 
 @dataclass

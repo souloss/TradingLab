@@ -2,16 +2,14 @@
 均值回归策略
 """
 
-from typing import Any, Dict, List
+from typing import Dict, List
 
 import pandas as pd
-from loguru import logger
 
 from tradingapi.fetcher.interface import OHLCVExtendedSchema
-from tradingapi.strategy.config.base import BaseConfig
-
 from tradingapi.strategy.base import SignalResult, SignalType
 from tradingapi.strategy.config import BollingerBandsStrategyConfig
+from tradingapi.strategy.config.base import BaseConfig
 from tradingapi.strategy.strategies.base import MeanReversionStrategy, register_strategy
 
 

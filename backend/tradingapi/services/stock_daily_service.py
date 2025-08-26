@@ -1,5 +1,4 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 
 import pandas as pd
@@ -9,11 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tradingapi.fetcher.interface import StockInfoFetcher
 from tradingapi.fetcher.manager import manager
-from tradingapi.models import StockDailyData
 from tradingapi.models.stock_basic_info import StockBasicInfo
 from tradingapi.repositories.stock_basic_info import StockBasicInfoRepository
-from tradingapi.repositories.stock_daily_data import (StockDailyRepository,
-                                                      daily_data_to_dataframe)
+from tradingapi.repositories.stock_daily_data import (
+    StockDailyRepository,
+    daily_data_to_dataframe,
+)
 
 
 class StockDailyService:
@@ -23,7 +23,7 @@ class StockDailyService:
 
     # 根据股票代码，日期范围获取日线数据
     async def get_daily_by_code(
-        self, stock:StockBasicInfo, start_date: date, end_date: date
+        self, stock: StockBasicInfo, start_date: date, end_date: date
     ) -> pd.DataFrame:
         # 1. 日期标准化
         start_dt = pd.to_datetime(start_date)
@@ -42,15 +42,17 @@ class StockDailyService:
             )
             return pd.DataFrame()
 
-        daily_data = await self.repo.get_daily_data(stock.symbol, adjusted_start_dt, end_dt)
+        daily_data = await self.repo.get_daily_data(
+            stock.symbol, adjusted_start_dt, end_dt
+        )
         cached_df = daily_data_to_dataframe(daily_data)
         missing_days = []
 
         # 3. 检查缓存是否满足当前请求
         if not cached_df.empty:
             # 3.1 获取缓存日期范围
-            cache_min = cached_df.index.min()
-            cache_max = cached_df.index.max()
+            cached_df.index.min()
+            cached_df.index.max()
 
             req_dates = pd.date_range(start=adjusted_start_dt, end=end_dt, freq="B")
             # 进一步排除节假日（传入节假日列表）
@@ -60,11 +62,17 @@ class StockDailyService:
             missing_days = [d for d in trading_days if d not in cached_dates]
             # 如果没有任何交易日缺失，则使用缓存
             if not missing_days:
-                logger.debug(f"缓存满足要求: {stock.symbol} ({adjusted_start_dt} 至 {end_date})")
+                logger.debug(
+                    f"缓存满足要求: {stock.symbol} ({adjusted_start_dt} 至 {end_date})"
+                )
                 return _filter_date_range(cached_df, adjusted_start_dt, end_dt).copy()
 
         # 4. 确定需要获取的数据范围
-        fetch_ranges = _merge_consecutive_dates(missing_days) if missing_days else [(start_date, end_date)]
+        fetch_ranges = (
+            _merge_consecutive_dates(missing_days)
+            if missing_days
+            else [(start_date, end_date)]
+        )
 
         # 5. 获取缺失数据
         new_dfs = []
@@ -200,16 +208,18 @@ def _filter_date_range(
         return df.loc[mask]
     else:
         # 检查是否有日期列
-        date_columns = [col for col in df.columns if 'date' in col.lower()]
+        date_columns = [col for col in df.columns if "date" in col.lower()]
         if not date_columns:
-            raise ValueError(f"DataFrame既没有DatetimeIndex，也没有日期列。可用列: {df.columns.tolist()}")
-        
+            raise ValueError(
+                f"DataFrame既没有DatetimeIndex，也没有日期列。可用列: {df.columns.tolist()}"
+            )
+
         # 使用找到的日期列
         date_col = date_columns[0]
         # 确保日期列是datetime类型
         if not pd.api.types.is_datetime64_any_dtype(df[date_col]):
             df[date_col] = pd.to_datetime(df[date_col])
-        
+
         # 筛选日期范围
         mask = (df[date_col] >= start_dt) & (df[date_col] <= end_dt)
         return df.loc[mask]

@@ -3,37 +3,40 @@
 提供测试数据和共享的fixture
 """
 
-import importlib
-from datetime import datetime, timedelta
-
 import numpy as np
 import pandas as pd
 import pytest
 
-from tradingapi.strategy.indicators import momentum, trend, volatility, volume
 from tradingapi.strategy.indicators.base import IndicatorRegistry
 
 
 def _register_all_indicators():
     """Helper function to register all indicators"""
     # Import and register momentum indicators
-    from tradingapi.strategy.indicators.momentum import (MACD, KDJCalculator,
-                                                         RSICalculator)
+    from tradingapi.strategy.indicators.momentum import (
+        MACD,
+        KDJCalculator,
+        RSICalculator,
+    )
 
     IndicatorRegistry.register("RSI", RSICalculator)
     IndicatorRegistry.register("KDJ", KDJCalculator)
     IndicatorRegistry.register("MACD", MACD)
 
     # Import and register trend indicators
-    from tradingapi.strategy.indicators.trend import (ExponentialMovingAverage,
-                                                      MovingAverage)
+    from tradingapi.strategy.indicators.trend import (
+        ExponentialMovingAverage,
+        MovingAverage,
+    )
 
     IndicatorRegistry.register("MA", MovingAverage)
     IndicatorRegistry.register("EMA", ExponentialMovingAverage)
 
     # Import and register volatility indicators
-    from tradingapi.strategy.indicators.volatility import (AverageTrueRange,
-                                                           BollingerBands)
+    from tradingapi.strategy.indicators.volatility import (
+        AverageTrueRange,
+        BollingerBands,
+    )
 
     IndicatorRegistry.register("ATR", AverageTrueRange)
     IndicatorRegistry.register("BollingerBands", BollingerBands)

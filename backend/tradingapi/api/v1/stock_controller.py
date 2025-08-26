@@ -5,8 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tradingapi.core.db import get_session
 from tradingapi.schemas.response import APIResponse
-from tradingapi.schemas.stocks import (StockBasicInfoFilter,
-                                       StockBasicInfoSchema)
+from tradingapi.schemas.stocks import StockBasicInfoFilter, StockBasicInfoSchema
 from tradingapi.services.stock_service import StocksService
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])

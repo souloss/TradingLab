@@ -4,8 +4,7 @@ import random
 from datetime import datetime, timedelta
 from functools import partial, wraps
 from types import SimpleNamespace
-from typing import (Any, Callable, Coroutine, Dict, Generic, List, Optional,
-                    Set, Tuple, Type, TypeVar, Union)
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, TypeVar, Union
 
 from aiolimiter import AsyncLimiter
 from loguru import logger

@@ -1,6 +1,7 @@
 from tradingapi.tasks.stock_basic_task import update_stock_basic_info
 from tradingapi.tasks.stock_daily_task import update_stock_daily
 
+
 def init_scheduler_tasks(task_scheduler):
     run_on_start = False
 
@@ -8,7 +9,7 @@ def init_scheduler_tasks(task_scheduler):
         func=update_stock_basic_info,
         cron="0 0 * * *",  # 每天0点执行一次
         task_id="update_stock_basic_info_task",
-        run_on_start=run_on_start
+        run_on_start=run_on_start,
     )
 
     task_scheduler.add_task(

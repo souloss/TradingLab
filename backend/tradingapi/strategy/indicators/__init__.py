@@ -4,10 +4,14 @@
 """
 
 # 导入所有指标模块，这样装饰器会自动注册指标
-from . import base, momentum, trend, volatility, volume
 # 导出指标基类和注册机制
-from .base import (IndicatorCalculator, IndicatorCategory, IndicatorManager,
-                   IndicatorRegistry, register_indicator)
+from .base import (
+    IndicatorCalculator,
+    IndicatorCategory,
+    IndicatorManager,
+    IndicatorRegistry,
+    register_indicator,
+)
 
 __all__ = [
     "IndicatorRegistry",

@@ -1,8 +1,6 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import (Column, DateTime, Float, ForeignKey, Integer, String,
-                        UniqueConstraint, func)
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -50,8 +48,6 @@ class StockIndustry(StockIndustryBase, table=True):
 
 class StockIndustryCreate(StockIndustryBase):
     """创建股票行业请求模型"""
-
-    pass
 
 
 class StockIndustryUpdate(SQLModel):
@@ -105,8 +101,6 @@ class StockIndustryMapping(StockIndustryMappingBase, table=True):
 
 class StockIndustryMappingCreate(StockIndustryMappingBase):
     """创建股票行业关联请求模型"""
-
-    pass
 
 
 class StockIndustryMappingUpdate(SQLModel):

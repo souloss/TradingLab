@@ -1,18 +1,15 @@
 import asyncio
-import datetime
 
 import akshare as ak
 import pandas as pd
 from loguru import logger
-
-from tradingapi.fetcher.interface import OHLCVExtendedSchema
-from tradingapi.models.stock_basic_info import StockBasicInfo
 
 from ..base import DataSourceName, StockDataSource
 from ..manager import manager
 from .exchange import fetch_bj_stocks, fetch_sh_stocks, fetch_sz_stocks
 
 token = "27127e2b9c9a31e0b6f126568f4c2d4e5fd85a9d"
+
 
 @manager.register_data_source
 class XUEQIU(StockDataSource):
@@ -27,10 +24,7 @@ class XUEQIU(StockDataSource):
         """检查数据源是否可用"""
         try:
             df = await asyncio.wait_for(
-                asyncio.to_thread(
-                    ak.stock_individual_spot_xq,
-                    token=token
-                ),
+                asyncio.to_thread(ak.stock_individual_spot_xq, token=token),
                 timeout=self.timeout,
             )
             return True
@@ -38,13 +32,15 @@ class XUEQIU(StockDataSource):
             logger.error(f"健康检查失败, exception:{ex}")
             return False
 
-    async def _fetch_stock_detail(self, exchange:str, symbol: str):
+    async def _fetch_stock_detail(self, exchange: str, symbol: str):
         def _fetch():
-            stock_info = ak.stock_individual_spot_xq(symbol=exchange.upper() + symbol, token=token)
+            stock_info = ak.stock_individual_spot_xq(
+                symbol=exchange.upper() + symbol, token=token
+            )
             info_dict = dict(zip(stock_info["item"], stock_info["value"]))
             return {
                 "证券代码": symbol,
-                "交易所":exchange,
+                "交易所": exchange,
                 "名称": info_dict.get("名称", ""),
                 "总股本": info_dict.get("基金份额/总股本"),
                 "流通股": info_dict.get("流通股"),
@@ -94,7 +90,7 @@ class XUEQIU(StockDataSource):
 
     @manager.register_method(weight=1.2, max_requests_per_minute=30, max_concurrent=5)
     async def get_stock_basic_info(self, exchange, symbol):
-        return await self._fetch_stock_detail(exchange=exchange, symbol=symbol) 
+        return await self._fetch_stock_detail(exchange=exchange, symbol=symbol)
 
     @manager.register_method(weight=1.2, max_requests_per_minute=30, max_concurrent=5)
     async def get_all_stock_basic_info(self):
@@ -118,7 +114,10 @@ class XUEQIU(StockDataSource):
             stocks[col] = None
 
         # 并发获取股票详情
-        tasks = [ self._fetch_stock_detail(stock['交易所'], stock['证券代码']) for stock in stocks ]
+        tasks = [
+            self._fetch_stock_detail(stock["交易所"], stock["证券代码"])
+            for stock in stocks
+        ]
         results = await asyncio.gather(*tasks)
 
         # 将结果填充回 DataFrame

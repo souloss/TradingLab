@@ -3,9 +3,8 @@
 包含基础配置类和通用方法
 """
 
-from dataclasses import asdict, dataclass, field, fields
-from typing import (Any, Dict, Type, TypeVar, Union, get_args, get_origin,
-                    get_type_hints)
+from dataclasses import asdict, dataclass, fields
+from typing import Any, Dict, Type, TypeVar, Union, get_args, get_origin, get_type_hints
 
 from ..exceptions import ConfigurationError
 
@@ -71,7 +70,6 @@ class BaseConfig:
 
     def validate(self) -> None:
         """验证配置参数的有效性"""
-        pass
 
     @classmethod
     def from_dict(cls: Type[T], config_dict: Dict[str, Any]) -> T:

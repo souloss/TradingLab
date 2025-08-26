@@ -4,12 +4,15 @@ from pydantic import BaseModel, ConfigDict, Field, Tag, model_validator
 from pydantic.alias_generators import to_camel  # 官方驼峰生成器
 
 from tradingapi.strategy.config.indicators import VolumeConfig
-from tradingapi.strategy.config.strategies import (ATRBreakoutStrategyConfig,
-                                                   ATRConfig, MACDConfig,
-                                                   MACDStrategyConfig,
-                                                   MAConfig,
-                                                   MACrossStrategyConfig,
-                                                   VolumeSpikeStrategyConfig)
+from tradingapi.strategy.config.strategies import (
+    ATRBreakoutStrategyConfig,
+    ATRConfig,
+    MACDConfig,
+    MACDStrategyConfig,
+    MAConfig,
+    MACrossStrategyConfig,
+    VolumeSpikeStrategyConfig,
+)
 
 
 # ===== 策略参数模型 =====
@@ -158,9 +161,7 @@ class VolumeParameters(BaseModel):
             high_multiplier=self.sell_volume_multiplier,
             low_multiplier=self.buy_volume_multiplier,
             period=self.period,
-            volume_config=VolumeConfig(
-                ma_periods=[self.period]
-            )
+            volume_config=VolumeConfig(ma_periods=[self.period]),
         )
 
 

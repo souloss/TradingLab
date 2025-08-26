@@ -3,14 +3,29 @@ Strategy包初始化文件
 导出主要类和函数
 """
 
-from .base import (IndicatorResult, MarketRegime, SignalResult, SignalType,
-                   StrategyConfig)
-from .config import (ATRConfig, BollingerBandsConfig, MACDConfig, MAConfig,
-                     RSIConfig, VolumeConfig)
+from .base import (
+    IndicatorResult,
+    MarketRegime,
+    SignalResult,
+    SignalType,
+    StrategyConfig,
+)
+from .config import (
+    ATRConfig,
+    BollingerBandsConfig,
+    MACDConfig,
+    MAConfig,
+    RSIConfig,
+    VolumeConfig,
+)
 from .config_manager import ConfigManager
-from .exceptions import (ConfigurationError, IndicatorError,
-                         IndicatorNotFoundError, StrategyError,
-                         StrategyNotFoundError)
+from .exceptions import (
+    ConfigurationError,
+    IndicatorError,
+    IndicatorNotFoundError,
+    StrategyError,
+    StrategyNotFoundError,
+)
 from .manager import SignalManager, SignalManagerConfig, create_signal_manager
 
 # 导出主要类和函数

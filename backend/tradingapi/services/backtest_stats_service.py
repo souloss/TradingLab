@@ -1,34 +1,31 @@
 # app/services/backtest_service.py
 import asyncio
-import json
 import math
-import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import List
 
-import pandas as pd
+from backtesting import Backtest
 from chinese_calendar import is_holiday
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
-from backtesting import Strategy, Backtest
 
-from tradingapi.fetcher.interface import OHLCVExtendedSchema, StockInfoFetcher
-from tradingapi.repositories.stock_basic_info import dataframe_to_stock_data
-from tradingapi.fetcher.manager import manager
-
-from tradingapi.schemas.backtest import BacktestRequest, BacktestResponse, BacktestResultItem, BacktestResults, ChartData, TradeType
+from tradingapi.fetcher.interface import OHLCVExtendedSchema
+from tradingapi.models.backtest_stats import BacktestStatsTable
+from tradingapi.repositories.backtest_stats import BacktestStatsRepository
+from tradingapi.schemas.backtest import (
+    BacktestRequest,
+    BacktestResponse,
+    BacktestResultItem,
+    BacktestResults,
+    ChartData,
+    TradeType,
+)
 from tradingapi.services.base import BaseService
-from tradingapi.strategyv2.strategy import StrategyMap
 from tradingapi.strategyv2.model import parse_backtest_result
+from tradingapi.strategyv2.strategy import StrategyMap
 
 from .stock_daily_service import StockDailyService
 from .stock_service import StocksService
-
-
-from tradingapi.models.backtest_stats import BacktestStatsTable
-from tradingapi.repositories.backtest_stats import BacktestStatsRepository
-from tradingapi.services.base import BaseService
 
 
 class BacktestService(BaseService[BacktestStatsTable, BacktestStatsRepository]):
@@ -55,7 +52,7 @@ class BacktestService(BaseService[BacktestStatsTable, BacktestStatsRepository]):
             stockCode=ret.stock_code,
             stockName=ret.stock_name,
             chartData=[ChartData(**ep) for ep in ret.chart_data],
-            backtestStats=ret.to_pydantic()
+            backtestStats=ret.to_pydantic(),
         )
         return resp
 
@@ -98,9 +95,7 @@ class BacktestService(BaseService[BacktestStatsTable, BacktestStatsRepository]):
                 constraint=strategy.constraint(),
             )
         else:
-            stats = bt.run(
-                **req.strategy.parameters.model_dump()
-            )
+            stats = bt.run(**req.strategy.parameters.model_dump())
         if stats is not None or not stats.empty:
             logger.debug(f"回测结果:\n{stats}\n策略为:{stats._strategy}")
             # 准备图表数据
@@ -126,7 +121,9 @@ class BacktestService(BaseService[BacktestStatsTable, BacktestStatsRepository]):
                 for date, row in df.iterrows()
             ]
             backtest_stats = parse_backtest_result(stats)
-            record = BacktestStatsTable.from_pydantic(stock.symbol, stock.name, chart_data=chart_data, stats=backtest_stats)
+            record = BacktestStatsTable.from_pydantic(
+                stock.symbol, stock.name, chart_data=chart_data, stats=backtest_stats
+            )
             added_instance = await self.repo.create(record)
             if backtest_stats.sqn == math.nan:
                 backtest_stats.sqn = None
@@ -212,7 +209,11 @@ class BacktestService(BaseService[BacktestStatsTable, BacktestStatsRepository]):
                 if day_trades:
                     # 按时间排序，取最后一条交易记录的类型作为信号
                     day_trades_sorted = sorted(day_trades, key=lambda x: x.entry_time)
-                    signal_type = TradeType.BUY if day_trades_sorted[-1].entry_time == datetime.today() else TradeType.SELL
+                    signal_type = (
+                        TradeType.BUY
+                        if day_trades_sorted[-1].entry_time == datetime.today()
+                        else TradeType.SELL
+                    )
 
             # 创建回测结果项
             result_item = BacktestResultItem(

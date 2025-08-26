@@ -2,18 +2,16 @@
 测试信号管理器
 """
 
-from unittest.mock import MagicMock, patch
-
-import numpy as np
 import pandas as pd
-import pytest
 
 from tradingapi.strategy.base import SignalType, StrategyConfig
 from tradingapi.strategy.config_manager import ConfigManager
-from tradingapi.strategy.exceptions import StrategyNotFoundError
 from tradingapi.strategy.indicators.base import IndicatorManager
-from tradingapi.strategy.manager import (SignalManager, SignalManagerConfig,
-                                         create_signal_manager)
+from tradingapi.strategy.manager import (
+    SignalManager,
+    SignalManagerConfig,
+    create_signal_manager,
+)
 
 
 class TestSignalManagerConfig:
@@ -318,7 +316,7 @@ class TestSignalManager:
         signal_manager.add_strategy(rsi_config)
 
         # 修改策略的generate_signals方法，使其抛出异常
-        original_method = signal_manager.strategies["RSI"].generate_signals
+        signal_manager.strategies["RSI"].generate_signals
 
         def mock_generate_signals(df):
             raise Exception("Strategy error")

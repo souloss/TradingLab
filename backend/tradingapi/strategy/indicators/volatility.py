@@ -6,9 +6,8 @@ import numpy as np
 import pandas as pd
 
 from tradingapi.fetcher.interface import OHLCVExtendedSchema
-
 from tradingapi.strategy.base import IndicatorCategory, IndicatorResult
-from tradingapi.strategy.config import ATRConfig, BollingerBandsConfig, VolumeConfig
+from tradingapi.strategy.config import ATRConfig, BollingerBandsConfig
 from tradingapi.strategy.indicators.base import IndicatorCalculator, register_indicator
 
 

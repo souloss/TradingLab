@@ -1,14 +1,9 @@
-import asyncio
 import datetime
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from tradingapi.core.db import get_session_with_ctx
-from tradingapi.fetcher.manager import manager
 from tradingapi.fetcher.interface import StockInfoFetcher
-from tradingapi.repositories.stock_basic_info import (
-    StockBasicInfoRepository,
-    dataframe_to_stock_data,
-)
+from tradingapi.fetcher.manager import manager
+from tradingapi.repositories.stock_basic_info import StockBasicInfoRepository
 from tradingapi.repositories.stock_daily_data import StockDailyRepository
 
 

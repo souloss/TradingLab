@@ -1,13 +1,12 @@
 import math
-from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
-from sqlmodel import SQLModel, Field, Column, JSON
-from pydantic import TypeAdapter
+
 from fastapi.encoders import jsonable_encoder
+from sqlmodel import JSON, Column, Field, SQLModel
 
 from tradingapi.strategyv2.model import BacktestStats, EquityPoint, TradeRecord
-
 
 # ---------- JSON 安全序列化 ----------
 
@@ -100,13 +99,15 @@ class BacktestStatsTable(SQLModel, table=True):
     # ============ 转换方法 ============
 
     @classmethod
-    def from_pydantic(cls, stock_code, stock_name, chart_data, stats: BacktestStats) -> "BacktestStatsTable":
+    def from_pydantic(
+        cls, stock_code, stock_name, chart_data, stats: BacktestStats
+    ) -> "BacktestStatsTable":
         data = stats.model_dump()
 
         return cls(
             stock_name=stock_name,
             stock_code=stock_code,
-            chart_data = make_json_safe(chart_data),
+            chart_data=make_json_safe(chart_data),
             start=data["start"],
             end=data["end"],
             duration_seconds=data["duration"].total_seconds(),
@@ -177,7 +178,7 @@ class BacktestStatsTable(SQLModel, table=True):
             avg_trade_duration=timedelta(seconds=self.avg_trade_duration_seconds),
             profit_factor=self.profit_factor,
             expectancy_pct=self.expectancy_pct,
-            sqn = self.sqn if self.sqn is not None else 0.0,
+            sqn=self.sqn if self.sqn is not None else 0.0,
             kelly_criterion=self.kelly_criterion,
             # 🚨 把 JSON dict 转回 Pydantic 模型
             equity_curve=[EquityPoint(**ep) for ep in self.equity_curve],

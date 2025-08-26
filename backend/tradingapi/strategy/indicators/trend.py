@@ -5,10 +5,13 @@
 import pandas as pd
 
 from tradingapi.fetcher.interface import OHLCVExtendedSchema
-
 from tradingapi.strategy.config import EMAConfig, MAConfig
-from tradingapi.strategy.indicators.base import (IndicatorCalculator, IndicatorCategory, IndicatorResult,
-                   register_indicator)
+from tradingapi.strategy.indicators.base import (
+    IndicatorCalculator,
+    IndicatorCategory,
+    IndicatorResult,
+    register_indicator,
+)
 
 
 @register_indicator("MA")

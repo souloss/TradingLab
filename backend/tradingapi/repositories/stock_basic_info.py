@@ -1,11 +1,10 @@
 # models/stock_basic_info.py
-from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from datetime import date
+from typing import Dict, List, Optional
 
 import pandas as pd
-from sqlalchemy import Column, DateTime, func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import Field, SQLModel
 
 from tradingapi.models.stock_basic_info import StockBasicInfo
 from tradingapi.repositories.base import BaseRepository
