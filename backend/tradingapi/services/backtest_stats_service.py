@@ -181,12 +181,12 @@ class BacktestService(BaseService[BacktestStatsTable, BacktestStatsRepository]):
             buy_count = sum(
                 1
                 for trade in response.backtest_stats.trades
-                if trade.entry_time == datetime.today()
+                if trade.entry_time.date() == datetime.today().date()
             )
             sell_count = sum(
                 1
                 for trade in response.backtest_stats.trades
-                if trade.exit_time == datetime.today()
+                if trade.exit_time.date() == datetime.today().date()
             )
 
             # 确定目标日期（交易日）
@@ -212,14 +212,16 @@ class BacktestService(BaseService[BacktestStatsTable, BacktestStatsRepository]):
                 day_trades = [
                     t
                     for t in response.backtest_stats.trades
-                    if t.exit_time == target_date or t.entry_time == target_date
+                    if t.exit_time.date() == target_date
+                    or t.entry_time.date() == target_date
                 ]
                 if day_trades:
                     # 按时间排序，取最后一条交易记录的类型作为信号
                     day_trades_sorted = sorted(day_trades, key=lambda x: x.entry_time)
                     signal_type = (
                         TradeType.BUY
-                        if day_trades_sorted[-1].entry_time == datetime.today()
+                        if day_trades_sorted[-1].entry_time.date()
+                        == datetime.today().date()
                         else TradeType.SELL
                     )
 
