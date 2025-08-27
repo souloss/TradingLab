@@ -13,6 +13,7 @@ from tradingapi.fetcher.interface import OHLCVExtendedSchema
 from tradingapi.models.backtest_stats import BacktestStatsTable
 from tradingapi.repositories.backtest_stats import BacktestStatsRepository
 from tradingapi.schemas.backtest import (
+    BacktestListItem,
     BacktestRequest,
     BacktestResponse,
     BacktestResultItem,
@@ -20,12 +21,13 @@ from tradingapi.schemas.backtest import (
     ChartData,
     TradeType,
 )
+from tradingapi.schemas.response import PaginatedResponse
 from tradingapi.services.base import BaseService
 from tradingapi.strategyv2.model import parse_backtest_result
 from tradingapi.strategyv2.strategy import StrategyMap
 
-from .stock_daily_service import StockDailyService
-from .stock_service import StocksService
+from tradingapi.services.stock_daily_service import StockDailyService
+from tradingapi.services.stock_service import StocksService
 
 
 class BacktestService(BaseService[BacktestStatsTable, BacktestStatsRepository]):
@@ -38,6 +40,12 @@ class BacktestService(BaseService[BacktestStatsTable, BacktestStatsRepository]):
         self.repo = BacktestStatsRepository(session)
         self.daily_service = StockDailyService(session=session)
         self.stock_service = StocksService(session=session)
+
+    async def list_paged(
+        self, page: int = 1, page_size: int = 20, keyword: str | None = None
+    ) -> PaginatedResponse[BacktestListItem]:
+        objs = await self.repo.list_paged(page=page, page_size=page_size, keyword=keyword)
+        return objs
 
     # 获取所有回测结果
     async def list_all(self) -> List[BacktestResponse]:

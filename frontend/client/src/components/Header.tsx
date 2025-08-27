@@ -9,6 +9,7 @@ export default function Header() {
     { id: "home", path: "/", label: "量化分析首页", icon: "fas fa-chart-bar" },
     { id: "individual", path: "/individual", label: "个股回测", icon: "fas fa-search-dollar" },
     { id: "selection", path: "/selection", label: "选股回测", icon: "fas fa-filter" },
+    { id: "selection", path: "/backtests", label: "历史回测结果", icon: "fas fa-chart-bar" },
   ];
 
   return (

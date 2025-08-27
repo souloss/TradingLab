@@ -50,6 +50,21 @@ class BacktestResponse(BaseModel):
         ..., alias="backtestStats", description="回测统计"
     )
 
+# 回测列表项
+class BacktestListItem(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        from_attributes=True,
+        alias_generator=to_camel,
+    )
+    id: str = Field(..., description="回测 ID")
+    stock_code: str = Field(..., description="股票代码")
+    stock_name: str = Field(..., description="股票名称")
+    strategy: Dict = Field(..., description="策略参数")
+    start: datetime = Field(..., description="开始时间")
+    end: datetime = Field(..., description="结束时间")
+    # status: str = Field(..., description="回测状态：completed / running / failed")
+
 
 # 单股回测请求模型
 class BacktestRequest(BaseModel):

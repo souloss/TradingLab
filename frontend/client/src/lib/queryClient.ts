@@ -1,6 +1,15 @@
 import { QueryClient, QueryFunction, QueryFunctionContext, QueryCache, MutationCache } from "@tanstack/react-query";
 import { APIResponse } from "@/types";
 import { toast } from "@/hooks/use-toast";
+import { v4 as uuidv4 } from 'uuid';
+
+const logger = {
+  debug: (message: string, data?: unknown) => {
+    if (import.meta.env.DEV) {
+      console.debug(`[DEBUG] ${message}`, data);
+    }
+  }
+};
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -15,15 +24,24 @@ export async function apiRequest<T = any>(
   method: string,
   url: string,
   data?: unknown,
+  signal?: AbortSignal
 ): Promise<T> {
   const fullUrl = `${API_BASE_URL}${url}`;
+  const requestId = uuidv4();
 
   const res = await fetch(fullUrl, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    signal,
+  headers: {
+    ...(data ? { "Content-Type": "application/json" } : {}),
+    "X-Request-ID": requestId,
+    "X-Correlation-ID": requestId,
+  },
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
+
+  logger.debug(`API Request: ${method} ${url}`, { requestId });
 
   // HTTP 层检查
   await throwIfResNotOk(res);
@@ -75,7 +93,7 @@ export const getQueryFn: <T>(options: {
       const response: APIResponse<T> = await res.json();
 
       // 检查响应状态码
-      if (response.code !== 200) {
+      if (response.code !== 0) {
         throw new Error(response.message || `API request failed with code ${response.code}`);
       }
 
@@ -83,7 +101,7 @@ export const getQueryFn: <T>(options: {
       return response.data as T;
     };
 
-
+    
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

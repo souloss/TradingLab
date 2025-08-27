@@ -1,9 +1,10 @@
 from typing import Any, Generic, List, Optional, Sequence, TypeVar, Union
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel, inspect
+from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 ModelType = TypeVar("ModelType", bound=SQLModel)
 
@@ -67,15 +68,48 @@ class BaseRepository(Generic[ModelType]):
         limit: int = 100,
         order_by: Optional[Union[str, Sequence[str]]] = None,
         desc: bool = False,
+        keyword: Optional[str] = None,
+        keyword_fields: Optional[Sequence[str]] = None,
         **filters: Any,
     ) -> List[ModelType]:
         """
-        通用列表查询（支持过滤/排序/分页）。
+        通用列表查询（支持过滤/排序/分页/模糊搜索）。
         - order_by: 字段名或字段名序列
         - desc: 是否倒序（对所有 order_by 字段生效）
+        - keyword: 关键字，用于在 keyword_fields 上 ilike
         """
-        stmt = select(self.model_type).where(*self._build_conditions(filters))
+        stmt = select(self.model_type)
+        # 处理过滤
+        if filters:
+            for field, value in filters.items():
+                if isinstance(field, InstrumentedAttribute):
+                    stmt = stmt.where(field == value)
+                elif isinstance(field, str) and hasattr(self.model_type, field):
+                    stmt = stmt.where(getattr(self.model_type, field) == value)
+                else:
+                    raise ValueError(f"Invalid filter field: {field}")
 
+        # 处理模糊搜索
+        if keyword and keyword_fields:
+            conditions = []
+            for field in keyword_fields:
+                if isinstance(field, InstrumentedAttribute):
+                    col = field
+                elif isinstance(field, str):
+                    if not hasattr(self.model_type, field):
+                        raise AttributeError(
+                            f"{self.model_type.__name__} 不存在模糊搜索字段: {field}"
+                        )
+                    col = getattr(self.model_type, field)
+                else:
+                    raise TypeError(
+                        f"keyword_fields 必须是 str 或 InstrumentedAttribute, 但得到 {type(field)}"
+                    )
+                conditions.append(col.ilike(f"%{keyword}%"))
+            if conditions:
+                stmt = stmt.where(or_(*conditions))
+
+        # 排序
         if order_by:
             fields = [order_by] if isinstance(order_by, str) else list(order_by)
             order_cols = []
@@ -226,3 +260,18 @@ class BaseRepository(Generic[ModelType]):
 
         await self.session.commit()
         return objs
+
+    def _build_conditions(self, filters: dict):
+        """
+        默认过滤条件构建器（等于过滤）。
+        可以在子类重写以支持更复杂逻辑。
+        """
+        conditions = []
+        for field, value in filters.items():
+            if not hasattr(self.model_type, field):
+                raise AttributeError(
+                    f"{self.model_type.__name__} 不存在过滤字段: {field}"
+                )
+            col = getattr(self.model_type, field)
+            conditions.append(col == value)
+        return conditions

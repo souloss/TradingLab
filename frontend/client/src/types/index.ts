@@ -106,6 +106,27 @@ export type BacktestResultItem = {
 };
 export type BacktestResults = BacktestResultItem[];
 
+// 历史回测记录类型
+export interface BacktestListItem {
+  id: string;
+  start: string;
+  end: string;
+  stockCode: string;
+  stockName: string;
+  strategy: {
+    name: string;
+    params: Record<string, any>;
+  };
+  // createdAt: string;
+  // completedAt?: string;
+  // status: "completed" | "running" | "failed";
+}
+
+export interface BacktestListResp {
+  items: BacktestListItem[];
+  total: number;
+}
+
 export interface APIResponse<T>{
   code: number;
   message: string;

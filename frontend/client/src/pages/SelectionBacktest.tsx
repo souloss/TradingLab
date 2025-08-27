@@ -123,22 +123,16 @@ export default function SelectionBacktest() {
         buySignals: 0,
         sellSignals: 0,
         averageReturn: 0,
-        totalBuyCount: 0,
-        totalSellCount: 0
       };
     }
-    const buySignals = backtestResults.filter(r => r.signalType === 'BUY').length;
-    const sellSignals = backtestResults.filter(r => r.signalType === 'SELL').length;
-    const totalBuyCount = backtestResults.reduce((sum, r) => sum + r.buyCount, 0);
-    const totalSellCount = backtestResults.reduce((sum, r) => sum + r.sellCount, 0);
-    const averageReturn = backtestResults.reduce((sum, r) => sum + r.return, 0) / backtestResults.length;
+    const buySignals = backtestResults.filter((r: { signalType: string }) => r.signalType === 'BUY').length;
+    const sellSignals = backtestResults.filter((r: { signalType: string }) => r.signalType === 'SELL').length;
+    const averageReturn = backtestResults.reduce((sum: number, r: { return: number }) => sum + r.return, 0) / backtestResults.length;
     return {
       stockCount: backtestResults.length,
       buySignals,
       sellSignals,
       averageReturn,
-      totalBuyCount,
-      totalSellCount
     };
   }, [backtestResults]);
 

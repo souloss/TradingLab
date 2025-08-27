@@ -1,9 +1,15 @@
-from typing import Generic, Optional, TypeVar
+from typing import Generic, List, Optional, TypeVar
 
 from pydantic import BaseModel, Field
 
 T = TypeVar("T")
 
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    items: List[T]
+    total: int
+    page: int
+    pageSize: int
 
 class APIResponse(BaseModel, Generic[T]):
     data: Optional[T] = Field(None, description="响应数据")
