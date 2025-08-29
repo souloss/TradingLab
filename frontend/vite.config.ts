@@ -19,7 +19,7 @@ export default defineConfig({
   ],
   define: {
     // 将环境变量注入到客户端
-    'import.meta.env.VITE_API_BASE_URL': JSON.stringify(env.VITE_API_BASE_URL || 'http://localhost:8000'),
+    // 'import.meta.env.VITE_API_BASE_URL': JSON.stringify(env.VITE_API_BASE_URL || 'http://localhost:8000'),
   },
   resolve: {
     alias: {

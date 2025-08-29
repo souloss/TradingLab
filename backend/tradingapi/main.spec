@@ -1,4 +1,3 @@
-
 import os
 from pathlib import Path
 
@@ -49,6 +48,7 @@ hidden_imports = [
     'akshare',
     'akshare.futures.cons',
     'aiosqlite',
+    'talib.stream',
 ]
 
 # 收集所有数据文件
@@ -71,6 +71,11 @@ try:
         print(f"Warning: akshare calendar file not found at {calendar_file}")
 except ImportError:
     print("Warning: akshare not found during build")
+
+import backtesting
+datas.append(
+    (str(Path(backtesting.__file__).parent / "autoscale_cb.js"), "backtesting/autoscale_cb.js")
+)
 
 a = Analysis(
     ['main.py'],
@@ -110,5 +115,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,
+    icon="static/app.ico",
 )
