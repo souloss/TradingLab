@@ -15,10 +15,9 @@ class AppConfig(BaseSettings):
     LOG_LEVEL: str = Field("DEBUG")
     DEBUG: bool = Field(True)
 
-    # SQLite 数据库配置
-    SQLITE_DB_PATH: str = Field("stock_data.db")
-    SQLITE_ASYNC_DRIVER: str = Field("sqlite+aiosqlite")
-    SQLITE_SYNC_DRIVER: str = Field("sqlite")
+    # 完整数据库URL，默认 SQLite
+    # DATABASE_URL: str = Field("sqlite+aiosqlite:///stock_data.db")
+    DATABASE_URL: str = Field("sqlite+aiosqlite:///stock_data.db")
 
     # API配置
     # API_PREFIX: str = Field("/api")
@@ -29,20 +28,18 @@ class AppConfig(BaseSettings):
     LOG_DIR: str = Field("logs")
     CONFIG_FILE: Optional[str] = Field("config.yaml")
 
-    # 计算属性：完整的数据库URL
-    @property
-    def DATABASE_URL(self) -> str:
-        return f"{self.SQLITE_ASYNC_DRIVER}:///{self.SQLITE_DB_PATH}"
-
-    @field_validator("SQLITE_DB_PATH")
+    @field_validator("DATABASE_URL")
     @classmethod
-    def validate_sqlite_path(cls, v: str) -> str:
-        """确保SQLite数据库目录存在"""
-        if v:
-            db_path = Path(v)
-            if db_path.suffix:  # 是文件路径
+    def validate_database_url(cls, v: str) -> str:
+        """如果是 SQLite，自动创建文件目录"""
+        if v.startswith("sqlite") and "///" in v:
+            path_str = v.split("///", 1)[1]
+            db_path = Path(path_str)
+            if db_path.suffix:  # 文件
                 db_path.parent.mkdir(parents=True, exist_ok=True)
-            else:  # 是目录路径
+                if not db_path.exists():
+                    db_path.touch()
+            else:
                 db_path.mkdir(parents=True, exist_ok=True)
         return v
 
