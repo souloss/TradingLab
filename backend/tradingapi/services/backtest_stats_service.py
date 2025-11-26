@@ -1,4 +1,3 @@
-# app/services/backtest_service.py
 import asyncio
 import math
 from datetime import datetime, timedelta
@@ -44,7 +43,9 @@ class BacktestService(BaseService[BacktestStatsTable, BacktestStatsRepository]):
     async def list_paged(
         self, page: int = 1, page_size: int = 20, keyword: str | None = None
     ) -> PaginatedResponse[BacktestListItem]:
-        objs = await self.repo.list_paged(page=page, page_size=page_size, keyword=keyword)
+        objs = await self.repo.list_paged(
+            page=page, page_size=page_size, keyword=keyword
+        )
         return objs
 
     # 获取所有回测结果

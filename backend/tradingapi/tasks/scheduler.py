@@ -21,12 +21,14 @@ executors = {
 
 
 class TaskScheduler:
-    def __init__(self, url, use_async: bool = False):
+    def __init__(self, url: str, use_async: bool = False):
         """
         初始化任务调度器
 
         :param use_async: 是否使用异步调度器
         """
+        url = url.replace("+asyncpg", "")
+        url = url.replace("+aiosqlite", "")
         # 配置调度器
         jobstores = {"default": SQLAlchemyJobStore(url)}
 

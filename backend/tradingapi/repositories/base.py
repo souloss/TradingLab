@@ -1,7 +1,8 @@
 from typing import Any, Generic, List, Optional, Sequence, TypeVar, Union
 
-from sqlalchemy import ColumnElement, func, or_, select
-from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy import func, or_, select
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel, inspect
 from sqlalchemy.orm.attributes import InstrumentedAttribute
@@ -11,44 +12,38 @@ ModelType = TypeVar("ModelType", bound=SQLModel)
 
 class BaseRepository(Generic[ModelType]):
     """
-    SQLite 专用通用仓储类，基于 SQLModel + AsyncSession
-    - 支持对象入参
-    - 提供通用 CRUD
-    - 批量方法支持 batch_size
-    - bulk_upsert 使用 SQLite ON CONFLICT 实现
+    通用仓储类，基于 SQLModel + AsyncSession
+    - 支持 SQLite / PostgreSQL
+    - 提供 CRUD、批量操作、upsert
     """
 
     def __init__(self, session: AsyncSession, model_type: type[ModelType]):
         self.session = session
         self.model_type = model_type
-
-        # 自动解析表元信息
         table = inspect(model_type).tables[0]
         self.table = table
-        self.pk_column = list(table.primary_key.columns)[0]  # 假设单主键
-        self.pk_name = self.pk_column.name
+        self.pk_columns = [col.name for col in table.primary_key]
+        self.db_dialect = session.bind.dialect.name if session.bind else "sqlite"
 
-    # --------------------
-    # 基础查询
-    # --------------------
+    def _insert(self):
+        """返回数据库对应的 insert 类"""
+        return pg_insert if self.db_dialect == "postgresql" else sqlite_insert
+
+    # -------------------- 基础查询 --------------------
     async def get_by_id(self, id_: Any) -> Optional[ModelType]:
-        """根据主键获取记录"""
         return await self.session.get(self.model_type, id_)
 
     async def get_all(self) -> Sequence[ModelType]:
-        """获取所有记录"""
         stmt = select(self.model_type)
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
     async def get_count(self) -> int:
-        """获取记录总数"""
         stmt = select(func.count()).select_from(self.model_type)
         result = await self.session.execute(stmt)
         return result.scalar_one()
 
     async def exists(self, **conditions) -> bool:
-        """检查是否存在符合条件的记录"""
         stmt = select(func.count()).select_from(self.model_type)
         for field, value in conditions.items():
             stmt = stmt.where(getattr(self.model_type, field) == value)
@@ -56,7 +51,6 @@ class BaseRepository(Generic[ModelType]):
         return result.scalar_one() > 0
 
     async def get_first(self, **filters: Any) -> Optional[ModelType]:
-        """按条件获取第一条记录。"""
         stmt = select(self.model_type).where(*self._build_conditions(filters)).limit(1)
         result = await self.session.execute(stmt)
         return result.scalars().first()
@@ -72,55 +66,37 @@ class BaseRepository(Generic[ModelType]):
         keyword_fields: Optional[Sequence[str]] = None,
         **filters: Any,
     ) -> List[ModelType]:
-        """
-        通用列表查询（支持过滤/排序/分页/模糊搜索）。
-        - order_by: 字段名或字段名序列
-        - desc: 是否倒序（对所有 order_by 字段生效）
-        - keyword: 关键字，用于在 keyword_fields 上 ilike
-        """
         stmt = select(self.model_type)
-        # 处理过滤
-        if filters:
-            for field, value in filters.items():
-                if isinstance(field, InstrumentedAttribute):
-                    stmt = stmt.where(field == value)
-                elif isinstance(field, str) and hasattr(self.model_type, field):
-                    stmt = stmt.where(getattr(self.model_type, field) == value)
-                else:
-                    raise ValueError(f"Invalid filter field: {field}")
+        for field, value in filters.items():
+            col = getattr(self.model_type, field) if isinstance(field, str) else field
+            stmt = stmt.where(col == value)
 
-        # 处理模糊搜索
         if keyword and keyword_fields:
-            conditions = []
-            for field in keyword_fields:
-                if isinstance(field, InstrumentedAttribute):
-                    col = field
-                elif isinstance(field, str):
-                    if not hasattr(self.model_type, field):
-                        raise AttributeError(
-                            f"{self.model_type.__name__} 不存在模糊搜索字段: {field}"
+            stmt = stmt.where(
+                or_(
+                    *[
+                        (
+                            getattr(self.model_type, f).ilike(f"%{keyword}%")
+                            if isinstance(f, str)
+                            else f.ilike(f"%{keyword}%")
                         )
-                    col = getattr(self.model_type, field)
-                else:
-                    raise TypeError(
-                        f"keyword_fields 必须是 str 或 InstrumentedAttribute, 但得到 {type(field)}"
-                    )
-                conditions.append(col.ilike(f"%{keyword}%"))
-            if conditions:
-                stmt = stmt.where(or_(*conditions))
+                        for f in keyword_fields
+                    ]
+                )
+            )
 
-        # 排序
         if order_by:
             fields = [order_by] if isinstance(order_by, str) else list(order_by)
-            order_cols = []
-            for f in fields:
-                if not hasattr(self.model_type, f):
-                    raise AttributeError(
-                        f"{self.model_type.__name__} 不存在排序字段: {f}"
+            stmt = stmt.order_by(
+                *[
+                    (
+                        getattr(self.model_type, f).desc()
+                        if desc
+                        else getattr(self.model_type, f).asc()
                     )
-                col = getattr(self.model_type, f)
-                order_cols.append(col.desc() if desc else col.asc())
-            stmt = stmt.order_by(*order_cols)
+                    for f in fields
+                ]
+            )
 
         if offset:
             stmt = stmt.offset(offset)
@@ -128,97 +104,54 @@ class BaseRepository(Generic[ModelType]):
             stmt = stmt.limit(limit)
 
         result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        return result.scalars().all()
 
-    # --------------------
-    # 单对象 CRUD
-    # --------------------
+    # -------------------- CRUD --------------------
     async def create(self, obj: ModelType) -> ModelType:
-        """创建新记录"""
         self.session.add(obj)
         await self.session.commit()
         await self.session.refresh(obj)
         return obj
 
     async def update(self, obj: ModelType) -> ModelType:
-        """更新对象（整体替换）"""
         self.session.add(obj)
         await self.session.commit()
         await self.session.refresh(obj)
         return obj
 
     async def delete(self, obj: ModelType) -> None:
-        """删除记录"""
         await self.session.delete(obj)
         await self.session.commit()
 
     async def delete_by_id(self, id_: Any) -> bool:
-        """根据主键删除"""
         obj = await self.get_by_id(id_)
-        if obj is None:
+        if not obj:
             return False
         await self.delete(obj)
         return True
 
+    # -------------------- UPSERT --------------------
     async def upsert(
         self,
         obj: ModelType,
         conflict_columns: Optional[Sequence[str]] = None,
         update_columns: Optional[Sequence[str]] = None,
     ) -> ModelType:
-        """
-        SQLite 单条 UPSERT
-        - conflict_columns：冲突列，默认主键
-        - update_columns：需要更新的列，默认除冲突列外的所有列
-        """
-        if obj is None:
+        if not obj:
             return obj
 
-        # 获取表元信息
-        table = inspect(self.model_type).tables[0]
-        pk_columns = [col.name for col in table.primary_key]
+        conflict_cols = conflict_columns or self.pk_columns
+        all_cols = [c.name for c in self.table.columns]
+        update_cols = update_columns or [c for c in all_cols if c not in conflict_cols]
 
-        # 冲突列：用户未传则用主键
-        conflict_cols = conflict_columns or pk_columns
-
-        # 可更新列：用户未传则用非冲突列
-        all_columns = [col.name for col in table.columns]
-        update_cols = update_columns or [
-            c for c in all_columns if c not in conflict_cols
-        ]
-
-        stmt = insert(self.model_type).values(obj.model_dump())
+        stmt = self._insert()(self.model_type).values(obj.model_dump())
         stmt = stmt.on_conflict_do_update(
             index_elements=conflict_cols,
             set_={col: getattr(stmt.excluded, col) for col in update_cols},
         )
-
         await self.session.execute(stmt)
         await self.session.commit()
         return obj
-
-    # --------------------
-    # 批量操作
-    # --------------------
-    async def bulk_create(
-        self, objs: List[ModelType], batch_size: int = 1000
-    ) -> List[ModelType]:
-        """批量创建"""
-        for i in range(0, len(objs), batch_size):
-            self.session.add_all(objs[i : i + batch_size])
-            await self.session.flush()
-        await self.session.commit()
-        return objs
-
-    async def bulk_update(
-        self, objs: List[ModelType], batch_size: int = 1000
-    ) -> List[ModelType]:
-        """批量更新"""
-        for i in range(0, len(objs), batch_size):
-            self.session.add_all(objs[i : i + batch_size])
-            await self.session.flush()
-        await self.session.commit()
-        return objs
 
     async def bulk_upsert(
         self,
@@ -227,51 +160,26 @@ class BaseRepository(Generic[ModelType]):
         update_columns: Optional[Sequence[str]] = None,
         batch_size: int = 1000,
     ) -> List[ModelType]:
-        """
-        SQLite 批量 UPSERT（改进版）
-        - 避免手写 SQL，使用 SQLAlchemy insert().on_conflict_do_update()
-        - conflict_columns：指定冲突列（默认主键）
-        - update_columns：指定需要更新的列（默认除冲突列外的所有列）
-        """
-
         if not objs:
             return objs
 
-        # 获取表元信息
-        table = inspect(self.model_type).tables[0]
-        pk_columns = [col.name for col in table.primary_key]
-
-        # 冲突列：用户未传则用主键
-        conflict_cols = conflict_columns or pk_columns
-        # 可更新列：用户未传则用 非冲突列
-        all_columns = [col.name for col in table.columns]
-        update_cols = update_columns or [
-            c for c in all_columns if c not in conflict_cols
-        ]
+        conflict_cols = conflict_columns or self.pk_columns
+        all_cols = [c.name for c in self.table.columns]
+        update_cols = update_columns or [c for c in all_cols if c not in conflict_cols]
 
         for i in range(0, len(objs), batch_size):
             chunk = objs[i : i + batch_size]
-            stmt = insert(self.model_type).values([obj.model_dump() for obj in chunk])
+            stmt = self._insert()(self.model_type).values(
+                [o.model_dump() for o in chunk]
+            )
             stmt = stmt.on_conflict_do_update(
                 index_elements=conflict_cols,
                 set_={col: getattr(stmt.excluded, col) for col in update_cols},
             )
             await self.session.execute(stmt)
-
         await self.session.commit()
         return objs
 
+    # -------------------- 辅助 --------------------
     def _build_conditions(self, filters: dict):
-        """
-        默认过滤条件构建器（等于过滤）。
-        可以在子类重写以支持更复杂逻辑。
-        """
-        conditions = []
-        for field, value in filters.items():
-            if not hasattr(self.model_type, field):
-                raise AttributeError(
-                    f"{self.model_type.__name__} 不存在过滤字段: {field}"
-                )
-            col = getattr(self.model_type, field)
-            conditions.append(col == value)
-        return conditions
+        return [getattr(self.model_type, f) == v for f, v in filters.items()]

@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
     manager.complete_registration()
     await db_manager.initialize()
     task_scheduler = TaskScheduler(
-        url=app_config.SQLITE_SYNC_DRIVER + ":///" + app_config.SQLITE_DB_PATH,
+        url=app_config.DATABASE_URL,
         use_async=True,
     )
     init_scheduler_tasks(task_scheduler)
