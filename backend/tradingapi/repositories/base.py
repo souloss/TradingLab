@@ -1,5 +1,5 @@
 from typing import Any, Generic, List, Optional, Sequence, TypeVar, Union
-
+from sqlalchemy import schema as sa_schema
 from sqlalchemy import func, or_, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -8,6 +8,51 @@ from sqlmodel import SQLModel, inspect
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 ModelType = TypeVar("ModelType", bound=SQLModel)
+
+
+def _autoinc_pk_columns(model_type) -> list[str]:
+    """
+    返回模型上所有自增主键列名，兼容 SQLite 和 PostgreSQL（SERIAL/IDENTITY）。
+    - 识别 col.autoincrement == True 或 'auto'
+    - 识别 col.identity（Postgres IDENTITY）
+    - 识别 col.default 为 Sequence（SERIAL）
+    - 识别 col.server_default 中包含 nextval(...)（历史/特殊情况）
+    """
+    table = inspect(model_type).tables[0]
+    result = []
+    for col in table.columns:
+        if not col.primary_key:
+            continue
+
+        # 1) SQLite / SQLAlchemy autoincrement 标记
+        if getattr(col, "autoincrement", None) in (True, "auto"):
+            result.append(col.name)
+            continue
+
+        # 2) Postgres IDENTITY (col.identity != None)
+        if getattr(col, "identity", None) is not None:
+            result.append(col.name)
+            continue
+
+        # 3) SERIAL/BIGSERIAL -> default is a Sequence
+        if isinstance(getattr(col, "default", None), sa_schema.Sequence):
+            result.append(col.name)
+            continue
+
+        # 4) 有些情况下 server_default 保存为 DefaultClause(text('nextval(...)'))，尝试带防护地检查
+        sd = getattr(col, "server_default", None)
+        if sd is not None:
+            try:
+                # sd.arg 在大多数情况下能返回文本或 SQL 表达式
+                arg = getattr(sd, "arg", sd)
+                if arg is not None and "nextval" in str(arg):
+                    result.append(col.name)
+                    continue
+            except Exception:
+                # 不要抛异常影响流程
+                pass
+
+    return result
 
 
 class BaseRepository(Generic[ModelType]):
@@ -141,10 +186,14 @@ class BaseRepository(Generic[ModelType]):
             return obj
 
         conflict_cols = conflict_columns or self.pk_columns
-        all_cols = [c.name for c in self.table.columns]
+        # 剔除自增主键
+        auto_inc_cols = _autoinc_pk_columns(self.model_type)
+        raw_dict = obj.model_dump(exclude=set(auto_inc_cols))
+
+        all_cols = [c.name for c in self.table.columns if c.name not in auto_inc_cols]
         update_cols = update_columns or [c for c in all_cols if c not in conflict_cols]
 
-        stmt = self._insert()(self.model_type).values(obj.model_dump())
+        stmt = self._insert()(self.model_type).values(raw_dict)
         stmt = stmt.on_conflict_do_update(
             index_elements=conflict_cols,
             set_={col: getattr(stmt.excluded, col) for col in update_cols},
@@ -164,14 +213,15 @@ class BaseRepository(Generic[ModelType]):
             return objs
 
         conflict_cols = conflict_columns or self.pk_columns
-        all_cols = [c.name for c in self.table.columns]
+        auto_inc_cols = _autoinc_pk_columns(self.model_type)
+
+        all_cols = [c.name for c in self.table.columns if c.name not in auto_inc_cols]
         update_cols = update_columns or [c for c in all_cols if c not in conflict_cols]
 
         for i in range(0, len(objs), batch_size):
             chunk = objs[i : i + batch_size]
-            stmt = self._insert()(self.model_type).values(
-                [o.model_dump() for o in chunk]
-            )
+            raw_chunk = [o.model_dump(exclude=set(auto_inc_cols)) for o in chunk]
+            stmt = self._insert()(self.model_type).values(raw_chunk)
             stmt = stmt.on_conflict_do_update(
                 index_elements=conflict_cols,
                 set_={col: getattr(stmt.excluded, col) for col in update_cols},

@@ -24,9 +24,6 @@ class StockDailyDataBase(SQLModel):
         default_factory=datetime.utcnow,
         sa_column=Column(DateTime, default=func.now(), onupdate=func.now()),
     )  # 最后更新时间
-    __table_args__ = (
-        UniqueConstraint("symbol", "trade_date", name="uq_symbol_trade_date"),
-    )
 
 class StockDailyData(StockDailyDataBase, table=True):
     """股票每日数据表模型"""
